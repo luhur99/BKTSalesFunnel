@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LeadSource } from "@/types/lead";
 import { db } from "@/lib/supabase";
+import { LeadSource, Stage } from "@/types/lead";
+import { Loader2 } from "lucide-react";
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -16,82 +17,67 @@ interface AddLeadModalProps {
 
 export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     company: "",
     source_id: "",
+    current_stage_id: "",
     deal_value: "",
     notes: ""
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (isOpen) {
-      loadSources();
+      loadData();
     }
   }, [isOpen]);
 
-  const loadSources = async () => {
+  const loadData = async () => {
     try {
-      const data = await db.sources.getAll();
-      setSources(data || []);
-    } catch (error) {
-      console.error("Error loading sources:", error);
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = "Nama wajib diisi";
-    }
-
-    if (!formData.email.trim() && !formData.phone.trim()) {
-      newErrors.contact = "Email atau nomor telepon harus diisi";
-    }
-
-    if (formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      newErrors.email = "Format email tidak valid";
-    }
-
-    if (!formData.source_id) {
-      newErrors.source_id = "Sumber lead wajib dipilih";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    try {
-      setIsSubmitting(true);
-
-      // Get first Follow Up stage
-      const stages = await db.stages.getByFunnel("follow_up");
-      if (!stages || stages.length === 0) {
-        alert("Error: Follow Up stages not found. Please setup stages first.");
-        return;
+      const [sourcesData, stagesData] = await Promise.all([
+        db.sources.getAll(),
+        db.stages.getByFunnel("follow_up")
+      ]);
+      setSources(sourcesData);
+      setStages(stagesData);
+      
+      // Set default stage to first Follow Up stage
+      if (stagesData.length > 0 && !formData.current_stage_id) {
+        setFormData(prev => ({ ...prev, current_stage_id: stagesData[0].id }));
       }
+    } catch (error) {
+      console.error("Error loading data:", error);
+    }
+  };
 
-      await db.leads.create({
-        name: formData.name,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
-        company: formData.company || undefined,
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const selectedStage = stages.find(s => s.id === formData.current_stage_id);
+      
+      const leadData = {
+        name: formData.name || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        company: formData.company || null,
         source_id: formData.source_id,
-        current_stage_id: stages[0].id,
-        current_funnel: "follow_up",
+        current_stage_id: formData.current_stage_id,
+        current_funnel: selectedStage?.funnel_type || "follow_up",
         status: "active",
-        deal_value: formData.deal_value ? parseFloat(formData.deal_value) : undefined,
-        notes: formData.notes || undefined
-      });
+        deal_value: formData.deal_value ? parseFloat(formData.deal_value) : null,
+        last_response_note: formData.notes || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
+      await db.leads.create(leadData);
+      
       // Reset form
       setFormData({
         name: "",
@@ -99,18 +85,28 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
         phone: "",
         company: "",
         source_id: "",
+        current_stage_id: stages[0]?.id || "",
         deal_value: "",
         notes: ""
       });
-      setErrors({});
+      
       onSuccess();
       onClose();
     } catch (error) {
       console.error("Error creating lead:", error);
       alert("Gagal menambahkan lead. Silakan coba lagi.");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
+  };
+
+  const isFormValid = () => {
+    // At least one contact method must be provided
+    const hasContact = formData.email || formData.phone;
+    const hasSource = formData.source_id;
+    const hasStage = formData.current_stage_id;
+    
+    return hasContact && hasSource && hasStage;
   };
 
   return (
@@ -119,128 +115,160 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
         <DialogHeader>
           <DialogTitle className="text-2xl">Tambah Lead Baru</DialogTitle>
           <DialogDescription>
-            Lead baru akan otomatis masuk ke Follow Up Funnel Stage 1
+            Tambahkan lead baru ke sistem. Minimal satu kontak (email/phone) wajib diisi.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="name">
-                Nama <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nama lengkap lead"
-                className={errors.name ? "border-red-500" : ""}
-              />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Lead Information */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Informasi Lead</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nama (Opsional)</Label>
+                <Input
+                  id="name"
+                  placeholder="Nama lengkap..."
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="company">Company (Opsional)</Label>
+                <Input
+                  id="company"
+                  placeholder="Nama perusahaan..."
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                />
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="company">Perusahaan</Label>
-              <Input
-                id="company"
-                value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                placeholder="Nama perusahaan"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  Email <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="email@example.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  Phone <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="phone"
+                  placeholder="08123456789"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="text-sm text-slate-500 italic">
+              * Minimal satu kontak (email atau phone) wajib diisi
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@example.com"
-                className={errors.email ? "border-red-500" : ""}
-              />
-              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-            </div>
+          {/* Source & Stage */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Source & Stage</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="source">
+                  Lead Source <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.source_id} onValueChange={(v) => setFormData({ ...formData, source_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih source..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sources.map((source) => (
+                      <SelectItem key={source.id} value={source.id}>
+                        {source.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label htmlFor="phone">Nomor Telepon</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+62 812 3456 7890"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="stage">
+                  Initial Stage <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.current_stage_id} onValueChange={(v) => setFormData({ ...formData, current_stage_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih stage..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stages.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        {stage.stage_number}. {stage.stage_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
-          {errors.contact && (
-            <p className="text-sm text-red-500 bg-red-50 p-2 rounded">{errors.contact}</p>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="source">
-                Sumber Lead <span className="text-red-500">*</span>
-              </Label>
-              <Select value={formData.source_id} onValueChange={(value) => setFormData({ ...formData, source_id: value })}>
-                <SelectTrigger className={errors.source_id ? "border-red-500" : ""}>
-                  <SelectValue placeholder="Pilih sumber..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {sources.map((source) => (
-                    <SelectItem key={source.id} value={source.id}>
-                      {source.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.source_id && <p className="text-xs text-red-500 mt-1">{errors.source_id}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="deal_value">Estimasi Nilai Deal (Rp)</Label>
+          {/* Deal Value & Notes */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Detail Tambahan</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="deal_value">Estimasi Deal Value (Opsional)</Label>
               <Input
                 id="deal_value"
                 type="number"
+                placeholder="5000000"
                 value={formData.deal_value}
                 onChange={(e) => setFormData({ ...formData, deal_value: e.target.value })}
-                placeholder="0"
-                min="0"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Catatan Awal (Opsional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Catatan atau informasi tambahan tentang lead ini..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
               />
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="notes">Catatan</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Catatan tambahan tentang lead ini..."
-              rows={3}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1"
-            >
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Batal
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
+            <Button 
+              type="submit" 
+              disabled={!isFormValid() || loading}
               className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             >
-              {isSubmitting ? "Menyimpan..." : "Tambah Lead"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                "Tambah Lead"
+              )}
             </Button>
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

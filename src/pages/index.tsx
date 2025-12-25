@@ -4,11 +4,11 @@ import { BarChart3, Users, TrendingUp, DollarSign, Filter, Plus, Settings } from
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LeadKanban } from "@/components/LeadKanban";
+import { LeadListView } from "@/components/LeadListView";
 import { LeadDetailModal } from "@/components/LeadDetailModal";
 import { BottleneckAnalytics } from "@/components/BottleneckAnalytics";
 import { AddLeadModal } from "@/components/AddLeadModal";
-import { Lead, FunnelType } from "@/types/lead";
+import { Lead } from "@/types/lead";
 import { db } from "@/lib/supabase";
 
 export default function Dashboard() {
@@ -25,7 +25,7 @@ export default function Dashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("leads");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
@@ -49,12 +49,6 @@ export default function Dashboard() {
   const handleLeadUpdate = () => {
     setRefreshTrigger(prev => prev + 1);
     loadMetrics();
-  };
-
-  const getGrowthIndicator = (current: number, previous: number = 0) => {
-    if (previous === 0) return { percentage: 0, isPositive: true };
-    const growth = ((current - previous) / previous) * 100;
-    return { percentage: Math.abs(growth), isPositive: growth >= 0 };
   };
 
   return (
@@ -179,7 +173,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-slate-900 mb-2">
-                  Rp {(metrics.total_deal_value / 1000).toFixed(0)}jt
+                  Rp {(metrics.total_deal_value / 1000000).toFixed(1)}jt
                 </div>
                 <div className="text-sm text-slate-600">
                   Nilai deals yang berhasil ditutup
@@ -188,123 +182,24 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Funnel Tabs */}
+          {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <div className="flex items-center justify-between">
-              <TabsList className="bg-white/80 backdrop-blur border border-slate-200 shadow-sm">
-                <TabsTrigger 
-                  value="overview" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-                >
-                  Overview
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="follow-up" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-                >
-                  Follow Up Funnel
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="broadcast" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white"
-                >
-                  Broadcast Funnel
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="analytics" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white"
-                >
-                  Analytics
-                </TabsTrigger>
-              </TabsList>
+            <TabsList className="bg-white/80 backdrop-blur border border-slate-200 shadow-sm">
+              <TabsTrigger 
+                value="leads" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+              >
+                Daftar Leads
+              </TabsTrigger>
+              <TabsTrigger 
+                value="analytics" 
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white"
+              >
+                Analytics & Bottleneck
+              </TabsTrigger>
+            </TabsList>
 
-              <Button variant="outline" size="sm" className="gap-2">
-                <Filter className="w-4 h-4" />
-                Filter
-              </Button>
-            </div>
-
-            <TabsContent value="overview" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="border-slate-200 bg-white/80 backdrop-blur">
-                  <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Users className="w-4 h-4 text-blue-600" />
-                      </div>
-                      Follow Up Pipeline
-                    </CardTitle>
-                    <CardDescription>10 stage proses follow up intensif</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="text-center py-8">
-                        <div className="text-5xl font-bold text-blue-600 mb-2">{metrics.follow_up_leads}</div>
-                        <p className="text-slate-600">Leads aktif di Follow Up</p>
-                      </div>
-                      <Button 
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                        onClick={() => setActiveTab("follow-up")}
-                      >
-                        Lihat Detail Pipeline
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-slate-200 bg-white/80 backdrop-blur">
-                  <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <TrendingUp className="w-4 h-4 text-purple-600" />
-                      </div>
-                      Broadcast Pipeline
-                    </CardTitle>
-                    <CardDescription>10 stage re-engagement sequence</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="text-center py-8">
-                        <div className="text-5xl font-bold text-purple-600 mb-2">{metrics.broadcast_leads}</div>
-                        <p className="text-slate-600">Leads di Broadcast</p>
-                      </div>
-                      <Button 
-                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                        onClick={() => setActiveTab("broadcast")}
-                      >
-                        Lihat Detail Pipeline
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Quick Stats */}
-              <Card className="border-slate-200 bg-white/80 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="text-xl">Statistik Hari Ini</CardTitle>
-                  <CardDescription>Performance metrics real-time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
-                      <div className="text-3xl font-bold text-blue-600 mb-1">{metrics.follow_up_leads}</div>
-                      <div className="text-sm text-slate-600">Leads baru hari ini</div>
-                    </div>
-                    <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg">
-                      <div className="text-3xl font-bold text-green-600 mb-1">{metrics.deals_closed}</div>
-                      <div className="text-sm text-slate-600">Deals ditutup hari ini</div>
-                    </div>
-                    <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg">
-                      <div className="text-3xl font-bold text-purple-600 mb-1">{metrics.broadcast_leads}</div>
-                      <div className="text-sm text-slate-600">Re-engagement aktif</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="follow-up" className="space-y-6">
+            <TabsContent value="leads" className="space-y-6">
               <Card className="border-slate-200 bg-white/80 backdrop-blur">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -313,9 +208,9 @@ export default function Dashboard() {
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                           <Users className="w-4 h-4 text-white" />
                         </div>
-                        Follow Up Funnel - 10 Stages
+                        Semua Leads (Follow Up & Broadcast)
                       </CardTitle>
-                      <CardDescription>Proses follow up intensif untuk konversi maksimal</CardDescription>
+                      <CardDescription>Kelola leads dari semua funnel dalam satu tampilan</CardDescription>
                     </div>
                     <Button size="sm" className="gap-2" onClick={() => setIsAddLeadModalOpen(true)}>
                       <Plus className="w-4 h-4" />
@@ -324,31 +219,9 @@ export default function Dashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <LeadKanban 
-                    funnelType="follow_up" 
+                  <LeadListView 
                     onLeadClick={handleLeadClick}
-                    key={`follow-up-${refreshTrigger}`}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="broadcast" className="space-y-6">
-              <Card className="border-slate-200 bg-white/80 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                      <TrendingUp className="w-4 h-4 text-white" />
-                    </div>
-                    Broadcast Funnel - 10 Stages
-                  </CardTitle>
-                  <CardDescription>Re-engagement sequence untuk leads yang tidak merespon</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <LeadKanban 
-                    funnelType="broadcast" 
-                    onLeadClick={handleLeadClick}
-                    key={`broadcast-${refreshTrigger}`}
+                    refreshTrigger={refreshTrigger}
                   />
                 </CardContent>
               </Card>
@@ -358,25 +231,6 @@ export default function Dashboard() {
               <BottleneckAnalytics key={`analytics-${refreshTrigger}`} />
             </TabsContent>
           </Tabs>
-
-          {/* CTA Banner */}
-          <div className="mt-8 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-8 text-white shadow-xl">
-            <div className="max-w-3xl">
-              <h2 className="text-3xl font-bold mb-3">Hubungkan ke Supabase</h2>
-              <p className="text-blue-100 mb-6 text-lg">
-                Untuk mulai mengelola leads Anda, hubungkan database Supabase menggunakan tombol di navbar. 
-                Schema database sudah siap dan menunggu Anda!
-              </p>
-              <div className="flex gap-4">
-                <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold">
-                  Lihat Panduan Setup
-                </Button>
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-                  Dokumentasi
-                </Button>
-              </div>
-            </div>
-          </div>
         </main>
       </div>
 

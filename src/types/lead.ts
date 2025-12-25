@@ -32,7 +32,7 @@ export interface StageScript {
 
 export interface Lead {
   id: string;
-  name: string;
+  name: string | null;
   email: string | null;
   phone: string | null;
   company: string | null;
