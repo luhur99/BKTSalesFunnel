@@ -120,6 +120,16 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <Link href="/guide">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Panduan
+                  </Button>
+                </Link>
                 <Link href="/settings">
                   <Button 
                     size="sm" 
