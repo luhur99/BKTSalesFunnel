@@ -88,6 +88,56 @@ const MOCK_LEADS = [
   }
 ];
 
+const MOCK_SCRIPTS = [
+  { 
+    id: "sc1", 
+    stage_id: "s1", 
+    script_text: "Halo, terima kasih sudah menghubungi Budi Karya Teknologi. Ada yang bisa kami bantu untuk kebutuhan bisnis Anda?",
+    media_links: ["https://bk-tech.com/portfolio"],
+    image_url: null,
+    video_url: null
+  },
+  { 
+    id: "sc2", 
+    stage_id: "b1", 
+    script_text: "Halo Kak, bagaimana kabar bisnisnya? Kami ada update fitur terbaru nih yang cocok untuk efisiensi operasional kakak.",
+    media_links: [],
+    image_url: null,
+    video_url: null
+  }
+];
+
+const MOCK_STAGE_HISTORY = [
+  {
+    id: "h1",
+    lead_id: "l1",
+    from_stage_id: "s1",
+    to_stage_id: "s2",
+    from_funnel: "follow_up",
+    to_funnel: "follow_up",
+    reason: "progression",
+    notes: "Customer merespon positif via WA",
+    moved_by: "Sales User",
+    moved_at: new Date(Date.now() - 86400000).toISOString(),
+    from_stage: MOCK_STAGES.find(s => s.id === "s1"),
+    to_stage: MOCK_STAGES.find(s => s.id === "s2")
+  },
+  {
+    id: "h2",
+    lead_id: "l1",
+    from_stage_id: null,
+    to_stage_id: "s1",
+    from_funnel: null,
+    to_funnel: "follow_up",
+    reason: "new_lead",
+    notes: "Lead masuk dari Facebook Ads",
+    moved_by: "System",
+    moved_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+    from_stage: null,
+    to_stage: MOCK_STAGES.find(s => s.id === "s1")
+  }
+];
+
 // Type-safe database helpers with fallback to mock data
 export const db = {
   // Leads
@@ -336,33 +386,42 @@ export const db = {
   scripts: {
     getByStage: async (stageId: string) => {
       if (!supabase) {
-        return {
-          id: "script1",
-          stage_id: stageId,
-          script_text: "Halo [Nama], terima kasih sudah menghubungi kami. Ada yang bisa kami bantu?",
-          media_links: ["https://example.com/brochure.pdf"]
-        };
+        return MOCK_SCRIPTS.find(s => s.stage_id === stageId) || null;
       }
-
       const { data, error } = await supabase
-        .from("stage_scripts")
+        .from("scripts")
         .select("*")
         .eq("stage_id", stageId)
         .single();
-      
       if (error && error.code !== "PGRST116") throw error;
       return data;
     },
-
+    
+    // Add create/update methods for completeness
     upsert: async (script: any) => {
-      if (!supabase) return script;
+        if (!supabase) return script;
+        const { data, error } = await supabase.from("scripts").upsert(script).select().single();
+        if (error) throw error;
+        return data;
+    }
+  },
 
+  stageHistory: {
+    getByLead: async (leadId: string) => {
+      if (!supabase) {
+        return MOCK_STAGE_HISTORY
+          .filter(h => h.lead_id === leadId)
+          .sort((a, b) => new Date(b.moved_at).getTime() - new Date(a.moved_at).getTime());
+      }
       const { data, error } = await supabase
-        .from("stage_scripts")
-        .upsert([script])
-        .select()
-        .single();
-      
+        .from("lead_stage_history")
+        .select(`
+          *,
+          from_stage:stages!lead_stage_history_from_stage_id_fkey(*),
+          to_stage:stages!lead_stage_history_to_stage_id_fkey(*)
+        `)
+        .eq("lead_id", leadId)
+        .order("moved_at", { ascending: false });
       if (error) throw error;
       return data;
     }
