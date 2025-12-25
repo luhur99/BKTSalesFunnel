@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Phone, Mail, Building2, DollarSign, Clock, MessageSquare } from "lucide-react";
 import { Lead, Stage, FunnelType } from "@/types/lead";
 import { db } from "@/lib/supabase";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MoreHorizontal, AlertCircle } from "lucide-react";
+import { Draggable } from "react-beautiful-dnd";
 
 interface LeadKanbanProps {
   funnelType: FunnelType;
@@ -90,12 +93,6 @@ export function LeadKanban({ funnelType, onLeadClick }: LeadKanbanProps) {
                           </div>
                         )}
                       </div>
-                      {lead.deal_value && (
-                        <Badge className="bg-green-100 text-green-700 border-0">
-                          <DollarSign className="w-3 h-3 mr-1" />
-                          {lead.deal_value.toLocaleString()}
-                        </Badge>
-                      )}
                     </div>
 
                     <div className="space-y-2">

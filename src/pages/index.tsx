@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { BarChart3, Users, TrendingUp, DollarSign, Filter, Plus, Settings } from "lucide-react";
+import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { LeadListView } from "@/components/LeadListView";
 import { LeadDetailModal } from "@/components/LeadDetailModal";
 import { BottleneckAnalytics } from "@/components/BottleneckAnalytics";
@@ -22,7 +23,9 @@ export default function Dashboard() {
     conversion_rate: 0,
     total_deal_value: 0
   });
+  const [bottlenecks, setBottlenecks] = useState<any[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("leads");
@@ -30,6 +33,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadMetrics();
+    loadBottlenecks();
   }, [refreshTrigger]);
 
   const loadMetrics = async () => {
@@ -41,14 +45,37 @@ export default function Dashboard() {
     }
   };
 
+  const loadBottlenecks = async () => {
+    try {
+      const analytics = await db.analytics.getBottleneckAnalytics();
+      const sorted = analytics
+        .filter(a => a.conversion_rate < 70)
+        .sort((a, b) => a.conversion_rate - b.conversion_rate)
+        .slice(0, 2);
+      setBottlenecks(sorted);
+    } catch (error) {
+      console.error("Error loading bottlenecks:", error);
+    }
+  };
+
   const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead);
     setIsLeadModalOpen(true);
   };
 
+  const handleEditClick = (lead: Lead) => {
+    setEditLead(lead);
+    setIsAddLeadModalOpen(true);
+  };
+
   const handleLeadUpdate = () => {
     setRefreshTrigger(prev => prev + 1);
     loadMetrics();
+  };
+
+  const handleCloseEditModal = () => {
+    setEditLead(null);
+    setIsAddLeadModalOpen(false);
   };
 
   return (
@@ -59,7 +86,6 @@ export default function Dashboard() {
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        {/* Header */}
         <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
           <div className="max-w-[1600px] mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
@@ -78,26 +104,19 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </Button>
                 <Button 
                   size="sm" 
                   className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                   onClick={() => setIsAddLeadModalOpen(true)}
                 >
-                  <Plus className="w-4 h-4" />
-                  Tambah Lead
+                  + Tambah Lead
                 </Button>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="max-w-[1600px] mx-auto px-6 py-8">
-          {/* Metrics Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
               <CardHeader className="pb-3">
@@ -165,24 +184,42 @@ export default function Dashboard() {
             <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Total Nilai Deal</CardDescription>
-                  <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-amber-600" />
+                  <CardDescription className="text-slate-600 font-medium">Top Bottlenecks</CardDescription>
+                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-slate-900 mb-2">
-                  Rp {(metrics.total_deal_value / 1000000).toFixed(1)}jt
-                </div>
-                <div className="text-sm text-slate-600">
-                  Nilai deals yang berhasil ditutup
-                </div>
+                {bottlenecks.length > 0 ? (
+                  <div className="space-y-3">
+                    {bottlenecks.map((bn, idx) => (
+                      <div key={bn.stage_id} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-semibold text-slate-700 truncate">
+                            {bn.stage_name}
+                          </div>
+                          <Badge className="bg-red-100 text-red-700 text-xs">
+                            {bn.conversion_rate.toFixed(0)}%
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <span>{bn.leads_stuck} stuck</span>
+                          <span>•</span>
+                          <span className="capitalize">{bn.funnel_type.replace("_", " ")}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500 text-center py-4">
+                    Tidak ada bottleneck terdeteksi
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Main Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="bg-white/80 backdrop-blur border border-slate-200 shadow-sm">
               <TabsTrigger 
@@ -212,15 +249,12 @@ export default function Dashboard() {
                       </CardTitle>
                       <CardDescription>Kelola leads dari semua funnel dalam satu tampilan</CardDescription>
                     </div>
-                    <Button size="sm" className="gap-2" onClick={() => setIsAddLeadModalOpen(true)}>
-                      <Plus className="w-4 h-4" />
-                      Tambah Lead
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <LeadListView 
                     onLeadClick={handleLeadClick}
+                    onEditClick={handleEditClick}
                     refreshTrigger={refreshTrigger}
                   />
                 </CardContent>
@@ -234,7 +268,6 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* Modals */}
       <LeadDetailModal
         lead={selectedLead}
         isOpen={isLeadModalOpen}
@@ -247,8 +280,9 @@ export default function Dashboard() {
 
       <AddLeadModal
         isOpen={isAddLeadModalOpen}
-        onClose={() => setIsAddLeadModalOpen(false)}
+        onClose={handleCloseEditModal}
         onSuccess={handleLeadUpdate}
+        editLead={editLead}
       />
     </>
   );

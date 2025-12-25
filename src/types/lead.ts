@@ -42,7 +42,7 @@ export interface Lead {
   status: LeadStatus;
   last_response_date: string | null;
   last_response_note: string | null;
-  deal_value: number | null;
+  custom_labels: string[];
   created_at: string;
   updated_at: string;
   source?: LeadSource;

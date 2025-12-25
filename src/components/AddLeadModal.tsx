@@ -5,20 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/supabase";
 import { LeadSource, Stage } from "@/types/lead";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 interface AddLeadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editLead?: any;
 }
 
-export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) {
+export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [labelInput, setLabelInput] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -26,14 +29,27 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
     company: "",
     source_id: "",
     current_stage_id: "",
+    custom_labels: [] as string[],
     notes: ""
   });
 
   useEffect(() => {
     if (isOpen) {
       loadData();
+      if (editLead) {
+        setFormData({
+          name: editLead.name || "",
+          email: editLead.email || "",
+          phone: editLead.phone || "",
+          company: editLead.company || "",
+          source_id: editLead.source_id || "",
+          current_stage_id: editLead.current_stage_id || "",
+          custom_labels: editLead.custom_labels || [],
+          notes: editLead.last_response_note || ""
+        });
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, editLead]);
 
   const loadData = async () => {
     try {
@@ -44,13 +60,29 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
       setSources(sourcesData);
       setStages(stagesData);
       
-      // Set default stage to first Follow Up stage
-      if (stagesData.length > 0 && !formData.current_stage_id) {
+      if (stagesData.length > 0 && !formData.current_stage_id && !editLead) {
         setFormData(prev => ({ ...prev, current_stage_id: stagesData[0].id }));
       }
     } catch (error) {
       console.error("Error loading data:", error);
     }
+  };
+
+  const handleAddLabel = () => {
+    if (labelInput.trim() && !formData.custom_labels.includes(labelInput.trim())) {
+      setFormData({ 
+        ...formData, 
+        custom_labels: [...formData.custom_labels, labelInput.trim()] 
+      });
+      setLabelInput("");
+    }
+  };
+
+  const handleRemoveLabel = (label: string) => {
+    setFormData({
+      ...formData,
+      custom_labels: formData.custom_labels.filter(l => l !== label)
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,16 +100,21 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
         source_id: formData.source_id,
         current_stage_id: formData.current_stage_id,
         current_funnel: selectedStage?.funnel_type || "follow_up",
-        status: "active",
-        deal_value: null,
+        status: editLead?.status || "active",
+        custom_labels: formData.custom_labels,
         last_response_note: formData.notes || null,
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      await db.leads.create(leadData);
+      if (editLead) {
+        await db.leads.update(editLead.id, leadData);
+      } else {
+        await db.leads.create({
+          ...leadData,
+          created_at: new Date().toISOString()
+        });
+      }
       
-      // Reset form
       setFormData({
         name: "",
         email: "",
@@ -85,25 +122,24 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
         company: "",
         source_id: "",
         current_stage_id: stages[0]?.id || "",
+        custom_labels: [],
         notes: ""
       });
       
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error creating lead:", error);
-      alert("Gagal menambahkan lead. Silakan coba lagi.");
+      console.error("Error saving lead:", error);
+      alert("Gagal menyimpan lead. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
   };
 
   const isFormValid = () => {
-    // Only phone is mandatory
     const hasPhone = formData.phone.trim() !== "";
     const hasSource = formData.source_id;
     const hasStage = formData.current_stage_id;
-    
     return hasPhone && hasSource && hasStage;
   };
 
@@ -111,14 +147,15 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Tambah Lead Baru</DialogTitle>
+          <DialogTitle className="text-2xl">
+            {editLead ? "Edit Lead" : "Tambah Lead Baru"}
+          </DialogTitle>
           <DialogDescription>
-            Tambahkan lead baru ke sistem. Wajib mengisi No. Phone/WhatsApp.
+            {editLead ? "Update informasi lead" : "Tambahkan lead baru ke sistem. Wajib mengisi No. Phone/WhatsApp."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Lead Information */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Informasi Lead</h3>
             
@@ -175,7 +212,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
             </div>
           </div>
 
-          {/* Source & Stage */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Source & Stage</h3>
             
@@ -218,7 +254,48 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
             </div>
           </div>
 
-          {/* Notes */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Custom Labels</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="labels">Tambah Label Kustom</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="labels"
+                  placeholder="Contoh: VIP, Hot Lead, Follow Up Urgent..."
+                  value={labelInput}
+                  onChange={(e) => setLabelInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddLabel();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={handleAddLabel} variant="outline">
+                  Tambah
+                </Button>
+              </div>
+              
+              {formData.custom_labels.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {formData.custom_labels.map((label, idx) => (
+                    <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1">
+                      {label}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLabel(label)}
+                        className="ml-2 hover:bg-slate-300 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Catatan</h3>
             
@@ -234,7 +311,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Batal
@@ -250,7 +326,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
                   Menyimpan...
                 </>
               ) : (
-                "Tambah Lead"
+                editLead ? "Update Lead" : "Tambah Lead"
               )}
             </Button>
           </div>
