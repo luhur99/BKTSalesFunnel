@@ -24,6 +24,7 @@ export default function LandingPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     password: ""
@@ -40,13 +41,28 @@ export default function LandingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
 
-    // Simulate login - Replace with actual authentication
-    setTimeout(() => {
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", formData.email);
-      router.push("/dashboard");
-    }, 1500);
+    // Hardcoded admin credentials
+    const ADMIN_EMAIL = "luhur@budikaryateknologi.com";
+    const ADMIN_PASSWORD = "BisnisBerkah";
+
+    // Validate credentials
+    if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
+      // Success - Store login state
+      setTimeout(() => {
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("userEmail", formData.email);
+        localStorage.setItem("userName", "Administrator");
+        router.push("/dashboard");
+      }, 1000);
+    } else {
+      // Failed - Show error
+      setTimeout(() => {
+        setError("Email atau password salah. Silakan coba lagi.");
+        setLoading(false);
+      }, 1000);
+    }
   };
 
   const features = [
@@ -152,6 +168,12 @@ export default function LandingPage() {
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-5">
+                    {error && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-600 font-medium">{error}</p>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
                         Email Address
@@ -163,7 +185,10 @@ export default function LandingPage() {
                           type="email"
                           placeholder="nama@perusahaan.com"
                           value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, email: e.target.value });
+                            setError("");
+                          }}
                           className="pl-11 h-12 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
                           required
                         />
@@ -181,7 +206,10 @@ export default function LandingPage() {
                           type={showPassword ? "text" : "password"}
                           placeholder="••••••••"
                           value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, password: e.target.value });
+                            setError("");
+                          }}
                           className="pl-11 pr-11 h-12 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
                           required
                         />
