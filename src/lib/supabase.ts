@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { Lead, LeadSource, Stage, LeadActivity, LeadStageHistory, StageScript, BottleneckAnalytics, FunnelType } from "@/types/lead";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
 
-export const supabase = createClient(supabaseUrl || "", supabaseKey || "");
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-export const isConnected = !!(supabaseUrl && supabaseKey && supabaseUrl !== "your-project-url");
+export const isConnected = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL !== "your-project-url";
 
 // Mock Data
 const MOCK_SOURCES: LeadSource[] = [
@@ -151,6 +151,68 @@ export const db = {
         .order("stage_number");
       if (error) throw error;
       return data;
+    },
+    create: async (stageData: { name: string; description?: string; funnel_type: FunnelType; order: number }) => {
+      if (!isConnected) {
+        const newStage: Stage = {
+          id: `stage-${Date.now()}`,
+          stage_name: stageData.name,
+          stage_number: stageData.order,
+          funnel_type: stageData.funnel_type,
+          description: stageData.description || null,
+          created_at: new Date().toISOString()
+        };
+        if (stageData.funnel_type === "follow_up") {
+          MOCK_FOLLOW_UP_STAGES.push(newStage);
+        } else {
+          MOCK_BROADCAST_STAGES.push(newStage);
+        }
+        return newStage;
+      }
+      const { data, error } = await supabase.from("stages").insert([{
+        stage_name: stageData.name,
+        stage_number: stageData.order,
+        funnel_type: stageData.funnel_type,
+        description: stageData.description
+      }]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    update: async (stageId: string, stageData: { name?: string; description?: string; order?: number }) => {
+      if (!isConnected) {
+        const allStages = [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES];
+        const index = allStages.findIndex(s => s.id === stageId);
+        if (index !== -1) {
+          if (stageData.name) allStages[index].stage_name = stageData.name;
+          if (stageData.description !== undefined) allStages[index].description = stageData.description || null;
+          if (stageData.order) allStages[index].stage_number = stageData.order;
+        }
+        return allStages[index];
+      }
+      const updateData: any = {};
+      if (stageData.name) updateData.stage_name = stageData.name;
+      if (stageData.description !== undefined) updateData.description = stageData.description;
+      if (stageData.order) updateData.stage_number = stageData.order;
+      
+      const { data, error } = await supabase.from("stages").update(updateData).eq("id", stageId).select().single();
+      if (error) throw error;
+      return data;
+    },
+    delete: async (stageId: string) => {
+      if (!isConnected) {
+        const fuIndex = MOCK_FOLLOW_UP_STAGES.findIndex(s => s.id === stageId);
+        if (fuIndex !== -1) {
+          MOCK_FOLLOW_UP_STAGES.splice(fuIndex, 1);
+          return;
+        }
+        const bcIndex = MOCK_BROADCAST_STAGES.findIndex(s => s.id === stageId);
+        if (bcIndex !== -1) {
+          MOCK_BROADCAST_STAGES.splice(bcIndex, 1);
+        }
+        return;
+      }
+      const { error } = await supabase.from("stages").delete().eq("id", stageId);
+      if (error) throw error;
     }
   },
 
@@ -340,6 +402,12 @@ export const db = {
   },
 
   scripts: {
+    getAll: async () => {
+      if (!isConnected) return MOCK_SCRIPTS;
+      const { data, error } = await supabase.from("stage_scripts").select("*");
+      if (error) throw error;
+      return data;
+    },
     getByStage: async (stageId: string) => {
       if (!isConnected) {
         return MOCK_SCRIPTS.find(s => s.stage_id === stageId) || null;
@@ -347,6 +415,49 @@ export const db = {
       const { data, error } = await supabase.from("stage_scripts").select("*").eq("stage_id", stageId).single();
       if (error) return null;
       return data;
+    },
+    create: async (scriptData: { stage_id: string; script_text: string; media_links?: string[]; image_url?: string | null; video_url?: string | null }) => {
+      if (!isConnected) {
+        const newScript = {
+          id: `script-${Date.now()}`,
+          stage_id: scriptData.stage_id,
+          script_text: scriptData.script_text,
+          media_links: scriptData.media_links || [],
+          image_url: scriptData.image_url || null,
+          video_url: scriptData.video_url || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        MOCK_SCRIPTS.push(newScript);
+        return newScript;
+      }
+      const { data, error } = await supabase.from("stage_scripts").insert([scriptData]).select().single();
+      if (error) throw error;
+      return data;
+    },
+    update: async (scriptId: string, scriptData: { script_text?: string; media_links?: string[]; image_url?: string | null; video_url?: string | null }) => {
+      if (!isConnected) {
+        const index = MOCK_SCRIPTS.findIndex(s => s.id === scriptId);
+        if (index !== -1) {
+          MOCK_SCRIPTS[index] = { ...MOCK_SCRIPTS[index], ...scriptData, updated_at: new Date().toISOString() };
+          return MOCK_SCRIPTS[index];
+        }
+        return null;
+      }
+      const { data, error } = await supabase.from("stage_scripts").update(scriptData).eq("id", scriptId).select().single();
+      if (error) throw error;
+      return data;
+    },
+    delete: async (scriptId: string) => {
+      if (!isConnected) {
+        const index = MOCK_SCRIPTS.findIndex(s => s.id === scriptId);
+        if (index !== -1) {
+          MOCK_SCRIPTS.splice(index, 1);
+        }
+        return;
+      }
+      const { error } = await supabase.from("stage_scripts").delete().eq("id", scriptId);
+      if (error) throw error;
     }
   },
 

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity } from "lucide-react";
+import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity, Globe, Tag } from "lucide-react";
 import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory } from "@/types/lead";
 import { db } from "@/lib/supabase";
 
@@ -25,7 +25,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   const [stageHistory, setStageHistory] = useState<LeadStageHistory[]>([]);
   const [script, setScript] = useState<StageScript | null>(null);
   const [moveToStage, setMoveToStage] = useState("");
-  const [moveReason, setMoveReason] = useState("");
   const [moveNotes, setMoveNotes] = useState("");
   const [newActivity, setNewActivity] = useState({
     type: "note" as ActivityType,
@@ -61,13 +60,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   };
 
   const handleMoveStage = async () => {
-    if (!lead || !moveToStage || !moveReason) return;
+    if (!lead || !moveToStage) return;
 
     try {
       setIsSubmitting(true);
-      await db.leads.moveToStage(lead.id, moveToStage, moveReason, moveNotes, "Sales User");
+      await db.leads.moveToStage(lead.id, moveToStage, "manual_move", moveNotes, "Sales User");
       setMoveToStage("");
-      setMoveReason("");
       setMoveNotes("");
       onUpdate();
       loadLeadData();
@@ -90,7 +88,15 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         response_received: newActivity.response_received,
         created_by: "Sales User"
       });
+      
+      // Update last_response_note on lead
+      await db.leads.update(lead.id, {
+        last_response_note: newActivity.description,
+        updated_at: new Date().toISOString()
+      });
+      
       setNewActivity({ type: "note", description: "", response_received: false });
+      onUpdate();
       loadLeadData();
     } catch (error) {
       console.error("Error adding activity:", error);
@@ -188,14 +194,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
               <DialogTitle className="text-2xl">
                 {lead.name || <span className="text-slate-400 italic">Lead Tanpa Nama</span>}
               </DialogTitle>
-              <div className="flex items-center gap-3 mt-2 text-sm text-slate-600">
+              <div className="flex items-center gap-3 mt-2 text-sm text-slate-600 flex-wrap">
+                <Badge variant="secondary" className="gap-1 font-normal">
+                  <Globe className="w-3 h-3" />
+                  {lead.source?.name || "Unknown Source"}
+                </Badge>
                 <div className="flex items-center gap-1">
                   <Phone className="w-4 h-4" />
                   {lead.phone}
                 </div>
                 {lead.email && (
                   <>
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <div className="flex items-center gap-1">
                       <Mail className="w-4 h-4" />
                       {lead.email}
@@ -204,7 +214,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 )}
                 {lead.company && (
                   <>
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <div className="flex items-center gap-1">
                       <Building2 className="w-4 h-4" />
                       {lead.company}
@@ -212,8 +222,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                   </>
                 )}
               </div>
+              {lead.custom_labels && lead.custom_labels.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap mt-3">
+                  <Tag className="w-4 h-4 text-slate-400" />
+                  {lead.custom_labels.map((label, idx) => (
+                    <Badge key={idx} variant="secondary" className="gap-1">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-col sm:flex-row items-end sm:items-center">
               <Badge className={
                 lead.status === "active" ? "bg-blue-100 text-blue-700 border-blue-200" :
                 lead.status === "deal" ? "bg-green-100 text-green-700 border-green-200" :
@@ -232,7 +252,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="history">History Timeline</TabsTrigger>
             <TabsTrigger value="script">Script</TabsTrigger>
-            <TabsTrigger value="activities">Activities</TabsTrigger>
+            <TabsTrigger value="response">Last Response</TabsTrigger>
             <TabsTrigger value="move">Move Stage</TabsTrigger>
           </TabsList>
 
@@ -247,12 +267,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
               <CardContent>
                 {stageHistory.length > 0 ? (
                   <div className="relative space-y-4">
-                    {/* Timeline line */}
                     <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500"></div>
                     
                     {stageHistory.map((history, index) => (
                       <div key={history.id} className="relative flex gap-4 pl-10">
-                        {/* Timeline dot */}
                         <div className={`absolute left-2.5 w-3 h-3 rounded-full ${
                           index === 0 ? "bg-green-500 ring-4 ring-green-100" : "bg-blue-500 ring-4 ring-blue-100"
                         }`}></div>
@@ -308,7 +326,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                       </div>
                     ))}
                     
-                    {/* Current stage indicator */}
                     <div className="relative flex gap-4 pl-10">
                       <div className="absolute left-2.5 w-3 h-3 rounded-full bg-yellow-500 ring-4 ring-yellow-100 animate-pulse"></div>
                       <div className="flex-1 bg-yellow-50 rounded-lg p-4 border-2 border-yellow-300">
@@ -323,6 +340,15 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                         <div className="text-sm text-slate-600 mt-1">
                           {lead.current_funnel === "follow_up" ? "Follow Up" : "Broadcast"} - Stage {lead.current_stage?.stage_number}
                         </div>
+                        {lead.last_response_note && (
+                          <div className="mt-3 pt-3 border-t border-yellow-200">
+                            <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 mb-1">
+                              <MessageSquare className="w-3 h-3" />
+                              Last Response:
+                            </div>
+                            <p className="text-sm text-slate-600 italic">{lead.last_response_note}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -415,10 +441,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
             )}
           </TabsContent>
 
-          <TabsContent value="activities" className="space-y-4">
+          <TabsContent value="response" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Tambah Activity</CardTitle>
+                <CardTitle className="text-lg">Tambah Response</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
@@ -438,11 +464,11 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 </div>
 
                 <div>
-                  <Label>Deskripsi</Label>
+                  <Label>Last Response</Label>
                   <Textarea
                     value={newActivity.description}
                     onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
-                    placeholder="Jelaskan aktivitas..."
+                    placeholder="Catat response terakhir dari lead..."
                     rows={3}
                   />
                 </div>
@@ -459,14 +485,14 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 </div>
 
                 <Button onClick={handleAddActivity} disabled={isSubmitting || !newActivity.description}>
-                  Tambah Activity
+                  Tambah Response
                 </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Riwayat Activity</CardTitle>
+                <CardTitle className="text-lg">Riwayat Response</CardTitle>
               </CardHeader>
               <CardContent>
                 {activities.length > 0 ? (
@@ -505,7 +531,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 ) : (
                   <div className="text-center py-8 text-slate-500">
                     <MessageSquare className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p>Belum ada activity</p>
+                    <p>Belum ada response</p>
                   </div>
                 )}
               </CardContent>
@@ -535,21 +561,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 </div>
 
                 <div>
-                  <Label>Alasan</Label>
-                  <Select value={moveReason} onValueChange={setMoveReason}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih alasan..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="progression">Progression Natural</SelectItem>
-                      <SelectItem value="no_response">Tidak Ada Respon</SelectItem>
-                      <SelectItem value="responded">Lead Merespon</SelectItem>
-                      <SelectItem value="manual_move">Pindah Manual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label>Catatan (Opsional)</Label>
                   <Textarea
                     value={moveNotes}
@@ -561,7 +572,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
                 <Button
                   onClick={handleMoveStage}
-                  disabled={isSubmitting || !moveToStage || !moveReason}
+                  disabled={isSubmitting || !moveToStage}
                   className="w-full"
                 >
                   Pindah Lead

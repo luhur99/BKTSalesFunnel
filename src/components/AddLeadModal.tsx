@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/supabase";
 import { LeadSource, Stage } from "@/types/lead";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Tag } from "lucide-react";
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -255,7 +255,10 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Custom Labels</h3>
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Tag className="w-5 h-5" />
+              Custom Labels
+            </h3>
             
             <div className="space-y-2">
               <Label htmlFor="labels">Tambah Label Kustom</Label>
@@ -280,7 +283,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
               {formData.custom_labels.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-3">
                   {formData.custom_labels.map((label, idx) => (
-                    <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1">
+                    <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 gap-1">
+                      <Tag className="w-3 h-3" />
                       {label}
                       <button
                         type="button"

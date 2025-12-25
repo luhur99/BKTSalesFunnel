@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle, Settings as SettingsIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,16 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <Link href="/settings">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <SettingsIcon className="w-4 h-4" />
+                    Settings
+                  </Button>
+                </Link>
                 <Button 
                   size="sm" 
                   className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"

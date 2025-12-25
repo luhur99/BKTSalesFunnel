@@ -18,9 +18,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Mail, Phone, Building2, Calendar, Edit, Tag } from "lucide-react";
+import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download } from "lucide-react";
 import { Lead, Stage, FunnelType } from "@/types/lead";
 import { db } from "@/lib/supabase";
+import * as XLSX from "xlsx";
 
 interface LeadListViewProps {
   onLeadClick: (lead: Lead) => void;
@@ -70,6 +71,43 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
     } catch (error) {
       console.error("Error changing stage:", error);
     }
+  };
+
+  const handleExportToExcel = () => {
+    const exportData = filteredLeads.map(lead => ({
+      "Nama": lead.name || "-",
+      "Email": lead.email || "-",
+      "Phone": lead.phone || "-",
+      "Company": lead.company || "-",
+      "Source": lead.source?.name || "-",
+      "Funnel": lead.current_funnel === "follow_up" ? "Follow Up" : "Broadcast",
+      "Stage": lead.current_stage ? `${lead.current_stage.stage_number}. ${lead.current_stage.stage_name}` : "-",
+      "Last Response": lead.last_response_note || "-",
+      "Status": lead.status === "active" ? "Aktif" : lead.status === "deal" ? "Deal" : "Lost",
+      "Custom Labels": lead.custom_labels?.join(", ") || "-",
+      "Last Update": formatDate(lead.updated_at)
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leads");
+    
+    const colWidths = [
+      { wch: 20 }, // Nama
+      { wch: 25 }, // Email
+      { wch: 15 }, // Phone
+      { wch: 20 }, // Company
+      { wch: 20 }, // Source
+      { wch: 15 }, // Funnel
+      { wch: 30 }, // Stage
+      { wch: 40 }, // Last Response
+      { wch: 10 }, // Status
+      { wch: 30 }, // Custom Labels
+      { wch: 15 }  // Last Update
+    ];
+    ws["!cols"] = colWidths;
+    
+    XLSX.writeFile(wb, `BKT-Leads-Export-${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const filteredLeads = leads
@@ -173,6 +211,11 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
             <SelectItem value="lost">Lost</SelectItem>
           </SelectContent>
         </Select>
+
+        <Button onClick={handleExportToExcel} variant="outline" className="gap-2">
+          <Download className="w-4 h-4" />
+          Export Excel
+        </Button>
       </div>
 
       <div className="text-sm text-slate-600">
@@ -187,6 +230,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
               <TableHead className="font-semibold">Source</TableHead>
               <TableHead className="font-semibold">Funnel</TableHead>
               <TableHead className="font-semibold">Stage</TableHead>
+              <TableHead className="font-semibold">Last Response</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
               <TableHead className="font-semibold">Last Update</TableHead>
               <TableHead className="font-semibold text-center">Actions</TableHead>
@@ -195,7 +239,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
           <TableBody>
             {filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={8} className="text-center py-12 text-slate-500">
                   Tidak ada leads ditemukan
                 </TableCell>
               </TableRow>
@@ -230,9 +274,9 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                       )}
                       {lead.custom_labels && lead.custom_labels.length > 0 && (
                         <div className="flex items-center gap-1 flex-wrap mt-2">
-                          <Tag className="w-3 h-3 text-slate-400" />
                           {lead.custom_labels.map((label, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
+                            <Badge key={idx} variant="outline" className="text-xs gap-1">
+                              <Tag className="w-2.5 h-2.5" />
                               {label}
                             </Badge>
                           ))}
@@ -279,6 +323,11 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                           ))}
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                    <div className="text-sm text-slate-600 max-w-xs truncate italic">
+                      {lead.last_response_note || <span className="text-slate-400">Belum ada response</span>}
+                    </div>
                   </TableCell>
                   <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
                     {getStatusBadge(lead.status)}
