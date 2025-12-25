@@ -56,16 +56,23 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
       .slice(0, 5);
   };
 
-  const getOverallStats = () => {
+  const getOverallStats = async () => {
     const totalEntered = analytics.reduce((sum, s) => sum + s.leads_entered, 0);
     const totalProgressed = analytics.reduce((sum, s) => sum + s.leads_progressed, 0);
     const totalStuck = analytics.reduce((sum, s) => sum + s.leads_stuck, 0);
-    const avgConversion = analytics.length > 0 
-      ? analytics.reduce((sum, s) => sum + s.conversion_rate, 0) / analytics.length 
-      : 0;
+    
+    // Get lost leads count from database
+    const allLeads = await db.leads.getAll();
+    const lostLeadsCount = allLeads.filter(lead => lead.status === "lost").length;
 
-    return { totalEntered, totalProgressed, totalStuck, avgConversion };
+    return { totalEntered, totalProgressed, totalStuck, lostLeadsCount };
   };
+
+  const [stats, setStats] = useState({ totalEntered: 0, totalProgressed: 0, totalStuck: 0, lostLeadsCount: 0 });
+
+  useEffect(() => {
+    getOverallStats().then(setStats);
+  }, [analytics]);
 
   if (loading) {
     return (
@@ -80,7 +87,6 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
 
   const bottlenecks = getBottleneckStages();
   const topPerformers = getTopPerformingStages();
-  const stats = getOverallStats();
 
   return (
     <div className="space-y-6">
@@ -132,11 +138,11 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Avg Conversion</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.avgConversion.toFixed(1)}%</p>
+                <p className="text-sm text-slate-600 mb-1">Lost Leads</p>
+                <p className="text-3xl font-bold text-slate-900">{stats.lostLeadsCount}</p>
               </div>
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-indigo-600" />
+              <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                <TrendingDown className="w-6 h-6 text-slate-600" />
               </div>
             </div>
           </CardContent>

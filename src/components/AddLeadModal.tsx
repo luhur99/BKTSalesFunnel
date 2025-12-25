@@ -56,14 +56,22 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
 
   const loadData = async () => {
     try {
-      const [sourcesData, stagesData] = await Promise.all([
-        db.sources.getAll(),
-        db.stages.getByFunnel("follow_up")
-      ]);
-      setSources(sourcesData);
+      // Load sources - use predefined sources: Facebook Ads, Google Ads, Social Media, Offline, Manual
+      const predefinedSources: LeadSource[] = [
+        { id: "facebook-ads", name: "Facebook Ads" },
+        { id: "google-ads", name: "Google Ads" },
+        { id: "social-media", name: "Social Media" },
+        { id: "offline", name: "Offline" },
+        { id: "manual", name: "Manual" }
+      ];
+      
+      const sourcesData = await db.sources.getAll();
+      setSources(sourcesData.length > 0 ? sourcesData : predefinedSources);
+      
+      const stagesData = await db.stages.getByFunnel("follow_up");
       setStages(stagesData);
       
-      // Load available labels from localStorage (settings)
+      // Load available labels from localStorage (Settings → Custom Labels)
       const storedLabels = localStorage.getItem("customLabels");
       if (storedLabels) {
         const labels = JSON.parse(storedLabels);
@@ -303,7 +311,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
             
             {availableLabels.length > 0 && (
               <div className="space-y-2">
-                <Label>Pilih dari Label yang Tersedia</Label>
+                <Label>Pilih dari Label yang Tersedia (dari Settings)</Label>
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border">
                   {availableLabels.map((label, idx) => {
                     const isSelected = formData.custom_labels.includes(label);

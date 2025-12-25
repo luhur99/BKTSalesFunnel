@@ -44,7 +44,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
     try {
       const [allStages, leadActivities, leadHistory, stageScript] = await Promise.all([
-        db.stages.getAll(),
+        db.stages.getAll(), // Load ALL stages (Follow Up + Broadcast)
         db.activities.getByLead(lead.id),
         db.stageHistory.getByLead(lead.id),
         lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null)
@@ -155,7 +155,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
   if (!lead) return null;
 
-  const availableStages = stages.filter(s => s.funnel_type === lead.current_funnel);
+  // Group stages by funnel type for better dropdown organization
+  const followUpStages = stages.filter(s => s.funnel_type === "follow_up");
+  const broadcastStages = stages.filter(s => s.funnel_type === "broadcast");
+  
   const activityTypeIcons = {
     call: Phone,
     email: Mail,
@@ -551,11 +554,31 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                       <SelectValue placeholder="Pilih stage..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableStages.map((stage) => (
-                        <SelectItem key={stage.id} value={stage.id}>
-                          Stage {stage.stage_number}: {stage.stage_name}
-                        </SelectItem>
-                      ))}
+                      {followUpStages.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50">
+                            Follow Up Funnel
+                          </div>
+                          {followUpStages.map((stage) => (
+                            <SelectItem key={stage.id} value={stage.id}>
+                              Stage {stage.stage_number}: {stage.stage_name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      
+                      {broadcastStages.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 mt-2">
+                            Broadcast Funnel
+                          </div>
+                          {broadcastStages.map((stage) => (
+                            <SelectItem key={stage.id} value={stage.id}>
+                              Stage {stage.stage_number}: {stage.stage_name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
