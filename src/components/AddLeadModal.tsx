@@ -38,21 +38,36 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   useEffect(() => {
     if (isOpen) {
       loadData();
-      if (editLead) {
-        setFormData({
-          name: editLead.name || "",
-          email: editLead.email || "",
-          phone: editLead.phone || "",
-          company: editLead.company || "",
-          source_id: editLead.source_id || "",
-          current_stage_id: editLead.current_stage_id || "",
-          status: editLead.status || "active",
-          custom_labels: editLead.custom_labels || [],
-          notes: editLead.last_response_note || ""
-        });
-      }
     }
-  }, [isOpen, editLead]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && editLead) {
+      setFormData({
+        name: editLead.name || "",
+        email: editLead.email || "",
+        phone: editLead.phone || "",
+        company: editLead.company || "",
+        source_id: editLead.source_id || "",
+        current_stage_id: editLead.current_stage_id || "",
+        status: editLead.status || "active",
+        custom_labels: editLead.custom_labels || [],
+        notes: editLead.last_response_note || ""
+      });
+    } else if (isOpen && !editLead) {
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        company: "",
+        source_id: "",
+        current_stage_id: stages[0]?.id || "",
+        status: "active",
+        custom_labels: [],
+        notes: ""
+      });
+    }
+  }, [isOpen, editLead, stages]);
 
   const loadData = async () => {
     try {
