@@ -38,6 +38,36 @@ export const db = {
       return data;
     },
 
+    getStats: async () => {
+      const { data: leads } = await supabase.from("leads").select("*");
+      
+      if (!leads) return {
+        total_leads: 0,
+        active_leads: 0,
+        deals_closed: 0,
+        lost_leads: 0,
+        follow_up_leads: 0,
+        broadcast_leads: 0,
+        conversion_rate: 0,
+        total_deal_value: 0
+      };
+
+      const active = leads.filter(l => l.status === "active");
+      const deals = leads.filter(l => l.status === "deal");
+      const lost = leads.filter(l => l.status === "lost");
+      
+      return {
+        total_leads: leads.length,
+        active_leads: active.length,
+        deals_closed: deals.length,
+        lost_leads: lost.length,
+        follow_up_leads: active.filter(l => l.current_funnel === "follow_up").length,
+        broadcast_leads: active.filter(l => l.current_funnel === "broadcast").length,
+        conversion_rate: leads.length > 0 ? (deals.length / leads.length) * 100 : 0,
+        total_deal_value: deals.reduce((sum, l) => sum + (l.deal_value || 0), 0)
+      };
+    },
+
     getByFunnel: async (funnel: "follow_up" | "broadcast") => {
       const { data, error } = await supabase
         .from("leads")
@@ -144,6 +174,19 @@ export const db = {
         .select("*")
         .eq("funnel_type", funnel)
         .order("stage_number");
+      
+      if (error) throw error;
+      return data;
+    }
+  },
+
+  // Sources
+  sources: {
+    getAll: async () => {
+      const { data, error } = await supabase
+        .from("lead_sources")
+        .select("*")
+        .order("name");
       
       if (error) throw error;
       return data;
