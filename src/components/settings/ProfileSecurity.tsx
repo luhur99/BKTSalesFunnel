@@ -1,13 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Mail, Shield, Key } from "lucide-react";
+import { User, Mail, Shield, Key, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+// Admin credentials
+const ADMIN_CREDENTIALS = {
+  email: "luhur@budikaryateknologi.com",
+  password: "BisnisBerkah",
+  name: "Luhur Budi Karya",
+  role: "Super Admin",
+};
+
 export function ProfileSecurity() {
+  const router = useRouter();
   const { toast } = useToast();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -15,15 +25,34 @@ export function ProfileSecurity() {
     new: "",
     confirm: "",
   });
+  const [userInfo, setUserInfo] = useState({
+    name: "",
+    email: "",
+    role: "",
+    joinDate: "",
+  });
 
-  const userInfo = {
-    name: "Admin BKT",
-    email: "admin@budikarya.com",
-    role: "Super Admin",
-    joinDate: "January 2025",
-  };
+  useEffect(() => {
+    // Get user info from localStorage
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    const userEmail = localStorage.getItem("userEmail");
+    const userName = localStorage.getItem("userName");
+
+    if (!isLoggedIn || isLoggedIn !== "true") {
+      router.push("/");
+      return;
+    }
+
+    setUserInfo({
+      name: userName || ADMIN_CREDENTIALS.name,
+      email: userEmail || ADMIN_CREDENTIALS.email,
+      role: ADMIN_CREDENTIALS.role,
+      joinDate: "January 2025",
+    });
+  }, [router]);
 
   const handleChangePassword = () => {
+    // Validate all fields filled
     if (!passwordForm.current || !passwordForm.new || !passwordForm.confirm) {
       toast({
         title: "Error",
@@ -33,6 +62,17 @@ export function ProfileSecurity() {
       return;
     }
 
+    // Validate current password
+    if (passwordForm.current !== ADMIN_CREDENTIALS.password) {
+      toast({
+        title: "Error",
+        description: "Password saat ini salah",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate new password match
     if (passwordForm.new !== passwordForm.confirm) {
       toast({
         title: "Error",
@@ -42,6 +82,7 @@ export function ProfileSecurity() {
       return;
     }
 
+    // Validate password length
     if (passwordForm.new.length < 8) {
       toast({
         title: "Error",
@@ -51,14 +92,29 @@ export function ProfileSecurity() {
       return;
     }
 
-    // Mock success
+    // Update admin password (in real app, this would update database)
+    ADMIN_CREDENTIALS.password = passwordForm.new;
+
     toast({
       title: "Success",
-      description: "Password berhasil diubah",
+      description: "Password berhasil diubah. Silakan login kembali dengan password baru.",
     });
 
+    // Clear form and close
     setPasswordForm({ current: "", new: "", confirm: "" });
     setIsChangingPassword(false);
+
+    // Logout after password change
+    setTimeout(() => {
+      handleLogout();
+    }, 2000);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userName");
+    router.push("/");
   };
 
   return (
@@ -206,6 +262,24 @@ export function ProfileSecurity() {
               <span className="text-xs text-green-600 font-medium">Current</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Logout Section */}
+      <Card className="border-red-200 bg-red-50/50">
+        <CardHeader>
+          <CardTitle className="text-red-700">Danger Zone</CardTitle>
+          <CardDescription>Keluar dari akun Anda</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="destructive"
+            onClick={handleLogout}
+            className="w-full sm:w-auto"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Logout dari Akun
+          </Button>
         </CardContent>
       </Card>
     </div>
