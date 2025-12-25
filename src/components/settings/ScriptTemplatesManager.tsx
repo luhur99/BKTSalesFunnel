@@ -112,12 +112,12 @@ export function ScriptTemplatesManager() {
 
   const getStageName = (stageId: string) => {
     const stage = stages.find((s) => s.id === stageId);
-    return stage ? stage.name : "Unknown";
+    return stage ? stage.stage_name : "Unknown";
   };
 
   const getFunnelType = (stageId: string) => {
     const stage = stages.find((s) => s.id === stageId);
-    return stage?.funnel_type || "followup";
+    return stage?.funnel_type || "follow_up";
   };
 
   return (
@@ -160,8 +160,8 @@ export function ScriptTemplatesManager() {
                   <TableRow key={script.id}>
                     <TableCell className="font-medium">{getStageName(script.stage_id)}</TableCell>
                     <TableCell>
-                      <Badge variant={getFunnelType(script.stage_id) === "followup" ? "default" : "secondary"}>
-                        {getFunnelType(script.stage_id) === "followup" ? "Follow Up" : "Broadcast"}
+                      <Badge variant={getFunnelType(script.stage_id) === "follow_up" ? "default" : "secondary"}>
+                        {getFunnelType(script.stage_id) === "follow_up" ? "Follow Up" : "Broadcast"}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-sm text-muted-foreground">
@@ -229,7 +229,7 @@ export function ScriptTemplatesManager() {
                 <SelectContent>
                   {stages.map((stage) => (
                     <SelectItem key={stage.id} value={stage.id}>
-                      {stage.name} ({stage.funnel_type === "followup" ? "Follow Up" : "Broadcast"})
+                      {stage.stage_name} ({stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"})
                     </SelectItem>
                   ))}
                 </SelectContent>

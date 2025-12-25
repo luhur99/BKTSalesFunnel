@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/supabase";
 import { LeadSource, Stage } from "@/types/lead";
-import { Loader2, X, Tag } from "lucide-react";
+import { Loader2, X, Tag, Plus } from "lucide-react";
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ interface AddLeadModalProps {
 export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
   const [formData, setFormData] = useState({
@@ -29,6 +30,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
     company: "",
     source_id: "",
     current_stage_id: "",
+    status: "active",
     custom_labels: [] as string[],
     notes: ""
   });
@@ -44,6 +46,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
           company: editLead.company || "",
           source_id: editLead.source_id || "",
           current_stage_id: editLead.current_stage_id || "",
+          status: editLead.status || "active",
           custom_labels: editLead.custom_labels || [],
           notes: editLead.last_response_note || ""
         });
@@ -60,6 +63,13 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       setSources(sourcesData);
       setStages(stagesData);
       
+      // Load available labels from localStorage (settings)
+      const storedLabels = localStorage.getItem("customLabels");
+      if (storedLabels) {
+        const labels = JSON.parse(storedLabels);
+        setAvailableLabels(labels.map((l: any) => l.name));
+      }
+      
       if (stagesData.length > 0 && !formData.current_stage_id && !editLead) {
         setFormData(prev => ({ ...prev, current_stage_id: stagesData[0].id }));
       }
@@ -75,6 +85,20 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         custom_labels: [...formData.custom_labels, labelInput.trim()] 
       });
       setLabelInput("");
+    }
+  };
+
+  const handleToggleLabel = (label: string) => {
+    if (formData.custom_labels.includes(label)) {
+      setFormData({
+        ...formData,
+        custom_labels: formData.custom_labels.filter(l => l !== label)
+      });
+    } else {
+      setFormData({
+        ...formData,
+        custom_labels: [...formData.custom_labels, label]
+      });
     }
   };
 
@@ -100,7 +124,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         source_id: formData.source_id,
         current_stage_id: formData.current_stage_id,
         current_funnel: selectedStage?.funnel_type || "follow_up",
-        status: editLead?.status || "active",
+        status: formData.status,
         custom_labels: formData.custom_labels,
         last_response_note: formData.notes || null,
         updated_at: new Date().toISOString()
@@ -122,6 +146,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         company: "",
         source_id: "",
         current_stage_id: stages[0]?.id || "",
+        status: "active",
         custom_labels: [],
         notes: ""
       });
@@ -213,9 +238,9 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
           </div>
 
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Source & Stage</h3>
+            <h3 className="font-semibold text-lg">Source, Stage & Status</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="source">
                   Lead Source <span className="text-red-500">*</span>
@@ -251,6 +276,22 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">
+                  Status <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="deal">Deal</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -260,8 +301,34 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
               Custom Labels
             </h3>
             
+            {availableLabels.length > 0 && (
+              <div className="space-y-2">
+                <Label>Pilih dari Label yang Tersedia</Label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border">
+                  {availableLabels.map((label, idx) => {
+                    const isSelected = formData.custom_labels.includes(label);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleToggleLabel(label)}
+                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                          isSelected 
+                            ? "bg-blue-600 text-white shadow-md" 
+                            : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Tag className="w-3 h-3 inline mr-1" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-2">
-              <Label htmlFor="labels">Tambah Label Kustom</Label>
+              <Label htmlFor="labels">Atau Tambah Label Baru</Label>
               <div className="flex gap-2">
                 <Input
                   id="labels"
@@ -275,26 +342,30 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                     }
                   }}
                 />
-                <Button type="button" onClick={handleAddLabel} variant="outline">
+                <Button type="button" onClick={handleAddLabel} variant="outline" className="gap-2">
+                  <Plus className="w-4 h-4" />
                   Tambah
                 </Button>
               </div>
               
               {formData.custom_labels.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {formData.custom_labels.map((label, idx) => (
-                    <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 gap-1">
-                      <Tag className="w-3 h-3" />
-                      {label}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveLabel(label)}
-                        className="ml-2 hover:bg-slate-300 rounded-full p-0.5"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
+                <div className="space-y-2 mt-3">
+                  <Label className="text-sm">Label Terpilih:</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.custom_labels.map((label, idx) => (
+                      <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1.5 gap-1">
+                        <Tag className="w-3 h-3" />
+                        {label}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLabel(label)}
+                          className="ml-2 hover:bg-slate-300 rounded-full p-0.5 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

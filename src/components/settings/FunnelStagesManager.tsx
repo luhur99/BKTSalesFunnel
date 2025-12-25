@@ -29,13 +29,13 @@ export function FunnelStagesManager() {
   const [broadcastStages, setBroadcastStages] = useState<Stage[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedFunnel, setSelectedFunnel] = useState<"followup" | "broadcast">("followup");
+  const [selectedFunnel, setSelectedFunnel] = useState<"follow_up" | "broadcast">("follow_up");
   const [editingStage, setEditingStage] = useState<Stage | null>(null);
   const [formData, setFormData] = useState({
-    name: "",
+    stage_name: "",
     description: "",
-    funnel_type: "followup" as "followup" | "broadcast",
-    order: 1,
+    funnel_type: "follow_up" as "follow_up" | "broadcast",
+    stage_number: 1,
   });
 
   useEffect(() => {
@@ -44,20 +44,20 @@ export function FunnelStagesManager() {
 
   const loadStages = async () => {
     const stages = await db.stages.getAll();
-    setFollowUpStages(stages.filter((s) => s.funnel_type === "followup").sort((a, b) => a.order - b.order));
-    setBroadcastStages(stages.filter((s) => s.funnel_type === "broadcast").sort((a, b) => a.order - b.order));
+    setFollowUpStages(stages.filter((s) => s.funnel_type === "follow_up").sort((a, b) => a.stage_number - b.stage_number));
+    setBroadcastStages(stages.filter((s) => s.funnel_type === "broadcast").sort((a, b) => a.stage_number - b.stage_number));
   };
 
   const handleAdd = async () => {
     try {
       await db.stages.create({
-        name: formData.name,
+        name: formData.stage_name,
         description: formData.description,
         funnel_type: formData.funnel_type,
-        order: formData.order,
+        order: formData.stage_number,
       });
       setIsAddDialogOpen(false);
-      setFormData({ name: "", description: "", funnel_type: "followup", order: 1 });
+      setFormData({ stage_name: "", description: "", funnel_type: "follow_up", stage_number: 1 });
       await loadStages();
     } catch (error) {
       console.error("Error adding stage:", error);
@@ -68,13 +68,13 @@ export function FunnelStagesManager() {
     if (!editingStage) return;
     try {
       await db.stages.update(editingStage.id, {
-        name: formData.name,
+        name: formData.stage_name,
         description: formData.description,
-        order: formData.order,
+        order: formData.stage_number,
       });
       setIsEditDialogOpen(false);
       setEditingStage(null);
-      setFormData({ name: "", description: "", funnel_type: "followup", order: 1 });
+      setFormData({ stage_name: "", description: "", funnel_type: "follow_up", stage_number: 1 });
       await loadStages();
     } catch (error) {
       console.error("Error updating stage:", error);
@@ -94,25 +94,25 @@ export function FunnelStagesManager() {
   const openEditDialog = (stage: Stage) => {
     setEditingStage(stage);
     setFormData({
-      name: stage.name,
+      stage_name: stage.stage_name,
       description: stage.description || "",
       funnel_type: stage.funnel_type,
-      order: stage.order,
+      stage_number: stage.stage_number,
     });
     setIsEditDialogOpen(true);
   };
 
-  const renderStageTable = (stages: Stage[], funnelType: "followup" | "broadcast") => (
+  const renderStageTable = (stages: Stage[], funnelType: "follow_up" | "broadcast") => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">
-          {funnelType === "followup" ? "Follow Up Stages" : "Broadcast Stages"}
+          {funnelType === "follow_up" ? "Follow Up Stages" : "Broadcast Stages"}
         </CardTitle>
         <Button
           size="sm"
           onClick={() => {
             setSelectedFunnel(funnelType);
-            setFormData({ ...formData, funnel_type: funnelType, order: stages.length + 1 });
+            setFormData({ ...formData, funnel_type: funnelType, stage_number: stages.length + 1 });
             setIsAddDialogOpen(true);
           }}
         >
@@ -143,10 +143,10 @@ export function FunnelStagesManager() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <GripVertical className="w-4 h-4 text-muted-foreground" />
-                      <Badge variant="outline">{stage.order}</Badge>
+                      <Badge variant="outline">{stage.stage_number}</Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{stage.name}</TableCell>
+                  <TableCell className="font-medium">{stage.stage_name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {stage.description || "-"}
                   </TableCell>
@@ -180,7 +180,7 @@ export function FunnelStagesManager() {
 
   return (
     <div className="space-y-6">
-      {renderStageTable(followUpStages, "followup")}
+      {renderStageTable(followUpStages, "follow_up")}
       {renderStageTable(broadcastStages, "broadcast")}
 
       {/* Add Dialog */}
@@ -194,8 +194,8 @@ export function FunnelStagesManager() {
               <Label>Nama Stage</Label>
               <Input
                 placeholder="Contoh: Initial Contact"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.stage_name}
+                onChange={(e) => setFormData({ ...formData, stage_name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -212,8 +212,8 @@ export function FunnelStagesManager() {
               <Input
                 type="number"
                 min={1}
-                value={formData.order}
-                onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })}
+                value={formData.stage_number}
+                onChange={(e) => setFormData({ ...formData, stage_number: parseInt(e.target.value) || 1 })}
               />
             </div>
           </div>
@@ -221,7 +221,7 @@ export function FunnelStagesManager() {
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleAdd} disabled={!formData.name.trim()}>
+            <Button onClick={handleAdd} disabled={!formData.stage_name.trim()}>
               Simpan
             </Button>
           </div>
@@ -239,8 +239,8 @@ export function FunnelStagesManager() {
               <Label>Nama Stage</Label>
               <Input
                 placeholder="Contoh: Initial Contact"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.stage_name}
+                onChange={(e) => setFormData({ ...formData, stage_name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
@@ -257,8 +257,8 @@ export function FunnelStagesManager() {
               <Input
                 type="number"
                 min={1}
-                value={formData.order}
-                onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })}
+                value={formData.stage_number}
+                onChange={(e) => setFormData({ ...formData, stage_number: parseInt(e.target.value) || 1 })}
               />
             </div>
           </div>
@@ -266,7 +266,7 @@ export function FunnelStagesManager() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleEdit} disabled={!formData.name.trim()}>
+            <Button onClick={handleEdit} disabled={!formData.stage_name.trim()}>
               Update
             </Button>
           </div>

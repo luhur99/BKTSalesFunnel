@@ -57,22 +57,6 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
     }
   };
 
-  const handleStageChange = async (leadId: string, newStageId: string) => {
-    try {
-      await db.leads.moveToStage(
-        leadId,
-        newStageId,
-        "manual_move",
-        "Changed via dropdown",
-        "Sales User"
-      );
-      
-      await loadData();
-    } catch (error) {
-      console.error("Error changing stage:", error);
-    }
-  };
-
   const handleExportToExcel = () => {
     const exportData = filteredLeads.map(lead => ({
       "Nama": lead.name || "-",
@@ -292,37 +276,15 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                   <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
                     {getFunnelBadge(lead.current_funnel)}
                   </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Select
-                      value={lead.current_stage_id}
-                      onValueChange={(newStageId) => handleStageChange(lead.id, newStageId)}
-                    >
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase">
-                          Follow Up
-                        </div>
-                        {stages
-                          .filter(s => s.funnel_type === "follow_up")
-                          .map(stage => (
-                            <SelectItem key={stage.id} value={stage.id}>
-                              {stage.stage_number}. {stage.stage_name}
-                            </SelectItem>
-                          ))}
-                        <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 uppercase border-t mt-1">
-                          Broadcast
-                        </div>
-                        {stages
-                          .filter(s => s.funnel_type === "broadcast")
-                          .map(stage => (
-                            <SelectItem key={stage.id} value={stage.id}>
-                              {stage.stage_number}. {stage.stage_name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-slate-900">
+                        {lead.current_stage?.stage_name || "-"}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Stage {lead.current_stage?.stage_number || "-"}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
                     <div className="text-sm text-slate-600 max-w-xs truncate italic">
