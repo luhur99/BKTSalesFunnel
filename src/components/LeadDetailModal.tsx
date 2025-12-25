@@ -188,7 +188,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
               <DialogTitle className="text-2xl">
                 {lead.name || <span className="text-slate-400 italic">Lead Tanpa Nama</span>}
               </DialogTitle>
-              <DialogDescription className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-3 mt-2 text-sm text-slate-600">
                 <div className="flex items-center gap-1">
                   <Phone className="w-4 h-4" />
                   {lead.phone}
@@ -211,7 +211,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                     </div>
                   </>
                 )}
-              </DialogDescription>
+              </div>
             </div>
             <div className="flex gap-2">
               <Badge className={
