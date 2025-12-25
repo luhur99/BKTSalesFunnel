@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle, Settings as SettingsIcon } from "lucide-react";
+import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle, Settings as SettingsIcon, BookOpen, Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
