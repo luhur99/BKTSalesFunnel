@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, ArrowLeft, Phone, Mail, Building2, DollarSign, Clock, MessageSquare, FileText, X } from "lucide-react";
-import { Lead, Stage, LeadActivity, ActivityType, StageScript } from "@/types/lead";
+import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity } from "lucide-react";
+import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory } from "@/types/lead";
 import { db } from "@/lib/supabase";
 
 interface LeadDetailModalProps {
@@ -22,6 +22,7 @@ interface LeadDetailModalProps {
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
   const [stages, setStages] = useState<Stage[]>([]);
   const [activities, setActivities] = useState<LeadActivity[]>([]);
+  const [stageHistory, setStageHistory] = useState<LeadStageHistory[]>([]);
   const [script, setScript] = useState<StageScript | null>(null);
   const [moveToStage, setMoveToStage] = useState("");
   const [moveReason, setMoveReason] = useState("");
@@ -43,14 +44,16 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     if (!lead) return;
 
     try {
-      const [allStages, leadActivities, stageScript] = await Promise.all([
+      const [allStages, leadActivities, leadHistory, stageScript] = await Promise.all([
         db.stages.getAll(),
         db.activities.getByLead(lead.id),
+        db.stageHistory.getByLead(lead.id),
         lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null)
       ]);
 
       setStages(allStages || []);
       setActivities(leadActivities || []);
+      setStageHistory(leadHistory || []);
       setScript(stageScript);
     } catch (error) {
       console.error("Error loading lead data:", error);
@@ -67,6 +70,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       setMoveReason("");
       setMoveNotes("");
       onUpdate();
+      loadLeadData();
     } catch (error) {
       console.error("Error moving stage:", error);
     } finally {
@@ -111,6 +115,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       onUpdate();
+      loadLeadData();
     } catch (error) {
       console.error("Error moving to broadcast:", error);
     } finally {
@@ -134,6 +139,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       onUpdate();
+      loadLeadData();
     } catch (error) {
       console.error("Error moving to follow up:", error);
     } finally {
@@ -152,29 +158,68 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     note: FileText
   };
 
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
+  const getReasonBadge = (reason: string) => {
+    const variants: Record<string, { color: string; label: string }> = {
+      progression: { color: "bg-blue-100 text-blue-700", label: "Progression" },
+      no_response: { color: "bg-orange-100 text-orange-700", label: "No Response" },
+      responded: { color: "bg-green-100 text-green-700", label: "Responded" },
+      manual_move: { color: "bg-purple-100 text-purple-700", label: "Manual Move" }
+    };
+    const variant = variants[reason] || variants.manual_move;
+    return <Badge className={variant.color}>{variant.label}</Badge>;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
-              <DialogTitle className="text-2xl">{lead.name}</DialogTitle>
-              <DialogDescription className="flex items-center gap-2 mt-2">
+              <DialogTitle className="text-2xl">
+                {lead.name || <span className="text-slate-400 italic">Lead Tanpa Nama</span>}
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-1">
+                  <Phone className="w-4 h-4" />
+                  {lead.phone}
+                </div>
+                {lead.email && (
+                  <>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Mail className="w-4 h-4" />
+                      {lead.email}
+                    </div>
+                  </>
+                )}
                 {lead.company && (
                   <>
-                    <Building2 className="w-4 h-4" />
-                    {lead.company}
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Building2 className="w-4 h-4" />
+                      {lead.company}
+                    </div>
                   </>
                 )}
               </DialogDescription>
             </div>
             <div className="flex gap-2">
               <Badge className={
-                lead.status === "active" ? "bg-blue-100 text-blue-700" :
-                lead.status === "deal" ? "bg-green-100 text-green-700" :
-                "bg-red-100 text-red-700"
+                lead.status === "active" ? "bg-blue-100 text-blue-700 border-blue-200" :
+                lead.status === "deal" ? "bg-green-100 text-green-700 border-green-200" :
+                "bg-gray-100 text-gray-700 border-gray-200"
               }>
-                {lead.status.toUpperCase()}
+                {lead.status === "active" ? "AKTIF" : lead.status === "deal" ? "DEAL" : "LOST"}
               </Badge>
               <Badge variant="outline">
                 {lead.current_funnel === "follow_up" ? "Follow Up" : "Broadcast"}
@@ -183,74 +228,113 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="details" className="mt-4">
+        <Tabs defaultValue="history" className="mt-4">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="history">History Timeline</TabsTrigger>
             <TabsTrigger value="script">Script</TabsTrigger>
             <TabsTrigger value="activities">Activities</TabsTrigger>
             <TabsTrigger value="move">Move Stage</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details" className="space-y-4">
+          <TabsContent value="history" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {lead.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm">{lead.email}</span>
-                  </div>
-                )}
-                {lead.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm">{lead.phone}</span>
-                  </div>
-                )}
-                {lead.deal_value && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-slate-500" />
-                    <span className="text-sm font-semibold">${lead.deal_value.toLocaleString()}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Current Stage</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Activity className="w-5 h-5" />
+                  Lead Journey Timeline
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">{lead.current_stage?.stage_name}</div>
-                    <div className="text-sm text-slate-600 mt-1">{lead.current_stage?.description}</div>
+                {stageHistory.length > 0 ? (
+                  <div className="relative space-y-4">
+                    {/* Timeline line */}
+                    <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500"></div>
+                    
+                    {stageHistory.map((history, index) => (
+                      <div key={history.id} className="relative flex gap-4 pl-10">
+                        {/* Timeline dot */}
+                        <div className={`absolute left-2.5 w-3 h-3 rounded-full ${
+                          index === 0 ? "bg-green-500 ring-4 ring-green-100" : "bg-blue-500 ring-4 ring-blue-100"
+                        }`}></div>
+                        
+                        <div className="flex-1 bg-slate-50 rounded-lg p-4 border border-slate-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                {history.from_stage_id ? (
+                                  <>
+                                    <Badge variant="outline" className="text-xs">
+                                      {history.from_funnel === "follow_up" ? "Follow Up" : "Broadcast"} - Stage {history.from_stage?.stage_number}
+                                    </Badge>
+                                    <ArrowRight className="w-4 h-4 text-slate-400" />
+                                    <Badge className="bg-indigo-100 text-indigo-700 text-xs">
+                                      {history.to_funnel === "follow_up" ? "Follow Up" : "Broadcast"} - Stage {history.to_stage?.stage_number}
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <Badge className="bg-green-100 text-green-700 text-xs">
+                                    Lead Masuk - {history.to_funnel === "follow_up" ? "Follow Up" : "Broadcast"} Stage {history.to_stage?.stage_number}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="font-semibold text-slate-900">
+                                {history.from_stage_id ? (
+                                  <>
+                                    {history.from_stage?.stage_name} → {history.to_stage?.stage_name}
+                                  </>
+                                ) : (
+                                  <>
+                                    Masuk ke {history.to_stage?.stage_name}
+                                  </>
+                                )}
+                              </div>
+                              {history.notes && (
+                                <p className="text-sm text-slate-600 mt-2">{history.notes}</p>
+                              )}
+                            </div>
+                            {getReasonBadge(history.reason)}
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-xs text-slate-500 mt-3 pt-3 border-t">
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {formatDateTime(history.moved_at)}
+                            </div>
+                            <div>
+                              Oleh: {history.moved_by}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Current stage indicator */}
+                    <div className="relative flex gap-4 pl-10">
+                      <div className="absolute left-2.5 w-3 h-3 rounded-full bg-yellow-500 ring-4 ring-yellow-100 animate-pulse"></div>
+                      <div className="flex-1 bg-yellow-50 rounded-lg p-4 border-2 border-yellow-300">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                            Posisi Saat Ini
+                          </Badge>
+                        </div>
+                        <div className="font-semibold text-slate-900">
+                          {lead.current_stage?.stage_name}
+                        </div>
+                        <div className="text-sm text-slate-600 mt-1">
+                          {lead.current_funnel === "follow_up" ? "Follow Up" : "Broadcast"} - Stage {lead.current_stage?.stage_number}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white">
-                    Stage {lead.current_stage?.stage_number}
-                  </Badge>
-                </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-500">
+                    <Activity className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                    <p>Belum ada history perpindahan stage</p>
+                    <p className="text-sm mt-1">Lead ini baru saja ditambahkan</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
-
-            {lead.last_response_date && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Last Response</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-start gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-slate-500 mt-0.5" />
-                    <span className="text-sm">{new Date(lead.last_response_date).toLocaleString()}</span>
-                  </div>
-                  {lead.last_response_note && (
-                    <p className="text-sm text-slate-600 mt-2">{lead.last_response_note}</p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             <div className="flex gap-2">
               {lead.current_funnel === "follow_up" && (
@@ -261,7 +345,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                   disabled={isSubmitting}
                 >
                   <ArrowRight className="w-4 h-4 mr-2" />
-                  Move to Broadcast (No Response)
+                  Pindah ke Broadcast (No Response)
                 </Button>
               )}
               {lead.current_funnel === "broadcast" && (
@@ -272,7 +356,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                   disabled={isSubmitting}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Follow Up (Responded)
+                  Kembali ke Follow Up (Responded)
                 </Button>
               )}
             </div>
@@ -326,7 +410,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
             ) : (
               <div className="text-center py-12 text-slate-500">
                 <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                <p>No script available for this stage</p>
+                <p>Belum ada script untuk stage ini</p>
               </div>
             )}
           </TabsContent>
@@ -334,11 +418,11 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
           <TabsContent value="activities" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Add Activity</CardTitle>
+                <CardTitle className="text-lg">Tambah Activity</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <Label>Activity Type</Label>
+                  <Label>Tipe Activity</Label>
                   <Select value={newActivity.type} onValueChange={(value: ActivityType) => setNewActivity({ ...newActivity, type: value })}>
                     <SelectTrigger>
                       <SelectValue />
@@ -354,11 +438,11 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 </div>
 
                 <div>
-                  <Label>Description</Label>
+                  <Label>Deskripsi</Label>
                   <Textarea
                     value={newActivity.description}
                     onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
-                    placeholder="Describe the activity..."
+                    placeholder="Jelaskan aktivitas..."
                     rows={3}
                   />
                 </div>
@@ -371,18 +455,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                     onChange={(e) => setNewActivity({ ...newActivity, response_received: e.target.checked })}
                     className="rounded"
                   />
-                  <Label htmlFor="response_received" className="text-sm">Lead responded</Label>
+                  <Label htmlFor="response_received" className="text-sm">Lead merespon</Label>
                 </div>
 
                 <Button onClick={handleAddActivity} disabled={isSubmitting || !newActivity.description}>
-                  Add Activity
+                  Tambah Activity
                 </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Activity History</CardTitle>
+                <CardTitle className="text-lg">Riwayat Activity</CardTitle>
               </CardHeader>
               <CardContent>
                 {activities.length > 0 ? (
@@ -410,8 +494,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                             <p className="text-sm text-slate-700">{activity.description}</p>
                             <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
                               <Clock className="w-3 h-3" />
-                              {new Date(activity.created_at).toLocaleString()}
-                              <span>• by {activity.created_by}</span>
+                              {formatDateTime(activity.created_at)}
+                              <span>• oleh {activity.created_by}</span>
                             </div>
                           </div>
                         </div>
@@ -421,7 +505,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 ) : (
                   <div className="text-center py-8 text-slate-500">
                     <MessageSquare className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p>No activities yet</p>
+                    <p>Belum ada activity</p>
                   </div>
                 )}
               </CardContent>
@@ -431,14 +515,14 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
           <TabsContent value="move" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Move to Different Stage</CardTitle>
+                <CardTitle className="text-lg">Pindah ke Stage Lain</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>Target Stage</Label>
                   <Select value={moveToStage} onValueChange={setMoveToStage}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select stage..." />
+                      <SelectValue placeholder="Pilih stage..." />
                     </SelectTrigger>
                     <SelectContent>
                       {availableStages.map((stage) => (
@@ -451,26 +535,26 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 </div>
 
                 <div>
-                  <Label>Reason</Label>
+                  <Label>Alasan</Label>
                   <Select value={moveReason} onValueChange={setMoveReason}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select reason..." />
+                      <SelectValue placeholder="Pilih alasan..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="progression">Natural Progression</SelectItem>
-                      <SelectItem value="no_response">No Response</SelectItem>
-                      <SelectItem value="responded">Lead Responded</SelectItem>
-                      <SelectItem value="manual_move">Manual Move</SelectItem>
+                      <SelectItem value="progression">Progression Natural</SelectItem>
+                      <SelectItem value="no_response">Tidak Ada Respon</SelectItem>
+                      <SelectItem value="responded">Lead Merespon</SelectItem>
+                      <SelectItem value="manual_move">Pindah Manual</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div>
-                  <Label>Notes (Optional)</Label>
+                  <Label>Catatan (Opsional)</Label>
                   <Textarea
                     value={moveNotes}
                     onChange={(e) => setMoveNotes(e.target.value)}
-                    placeholder="Add any relevant notes..."
+                    placeholder="Tambahkan catatan..."
                     rows={3}
                   />
                 </div>
@@ -480,7 +564,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                   disabled={isSubmitting || !moveToStage || !moveReason}
                   className="w-full"
                 >
-                  Move Lead
+                  Pindah Lead
                 </Button>
               </CardContent>
             </Card>

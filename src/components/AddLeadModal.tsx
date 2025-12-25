@@ -26,7 +26,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
     company: "",
     source_id: "",
     current_stage_id: "",
-    deal_value: "",
     notes: ""
   });
 
@@ -64,13 +63,13 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
       const leadData = {
         name: formData.name || null,
         email: formData.email || null,
-        phone: formData.phone || null,
+        phone: formData.phone,
         company: formData.company || null,
         source_id: formData.source_id,
         current_stage_id: formData.current_stage_id,
         current_funnel: selectedStage?.funnel_type || "follow_up",
         status: "active",
-        deal_value: formData.deal_value ? parseFloat(formData.deal_value) : null,
+        deal_value: null,
         last_response_note: formData.notes || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -86,7 +85,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
         company: "",
         source_id: "",
         current_stage_id: stages[0]?.id || "",
-        deal_value: "",
         notes: ""
       });
       
@@ -101,12 +99,12 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
   };
 
   const isFormValid = () => {
-    // At least one contact method must be provided
-    const hasContact = formData.email || formData.phone;
+    // Only phone is mandatory
+    const hasPhone = formData.phone.trim() !== "";
     const hasSource = formData.source_id;
     const hasStage = formData.current_stage_id;
     
-    return hasContact && hasSource && hasStage;
+    return hasPhone && hasSource && hasStage;
   };
 
   return (
@@ -115,7 +113,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
         <DialogHeader>
           <DialogTitle className="text-2xl">Tambah Lead Baru</DialogTitle>
           <DialogDescription>
-            Tambahkan lead baru ke sistem. Minimal satu kontak (email/phone) wajib diisi.
+            Tambahkan lead baru ke sistem. Wajib mengisi No. Phone/WhatsApp.
           </DialogDescription>
         </DialogHeader>
 
@@ -148,9 +146,20 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email <span className="text-red-500">*</span>
+                <Label htmlFor="phone">
+                  No. Phone/WhatsApp <span className="text-red-500">*</span>
                 </Label>
+                <Input
+                  id="phone"
+                  placeholder="08123456789"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email (Opsional)</Label>
                 <Input
                   id="email"
                   type="email"
@@ -159,22 +168,10 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">
-                  Phone <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="phone"
-                  placeholder="08123456789"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
             </div>
 
             <div className="text-sm text-slate-500 italic">
-              * Minimal satu kontak (email atau phone) wajib diisi
+              * Wajib mengisi No. Phone/WhatsApp
             </div>
           </div>
 
@@ -221,21 +218,10 @@ export function AddLeadModal({ isOpen, onClose, onSuccess }: AddLeadModalProps) 
             </div>
           </div>
 
-          {/* Deal Value & Notes */}
+          {/* Notes */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Detail Tambahan</h3>
+            <h3 className="font-semibold text-lg">Catatan</h3>
             
-            <div className="space-y-2">
-              <Label htmlFor="deal_value">Estimasi Deal Value (Opsional)</Label>
-              <Input
-                id="deal_value"
-                type="number"
-                placeholder="5000000"
-                value={formData.deal_value}
-                onChange={(e) => setFormData({ ...formData, deal_value: e.target.value })}
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="notes">Catatan Awal (Opsional)</Label>
               <Textarea

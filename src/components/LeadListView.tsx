@@ -148,15 +148,6 @@ export function LeadListView({ onLeadClick, refreshTrigger = 0 }: LeadListViewPr
     });
   };
 
-  const formatCurrency = (value: number | null) => {
-    if (!value) return "-";
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      maximumFractionDigits: 0
-    }).format(value);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -221,14 +212,13 @@ export function LeadListView({ onLeadClick, refreshTrigger = 0 }: LeadListViewPr
               <TableHead className="font-semibold">Funnel</TableHead>
               <TableHead className="font-semibold">Stage</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
-              <TableHead className="font-semibold">Deal Value</TableHead>
               <TableHead className="font-semibold">Last Update</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={6} className="text-center py-12 text-slate-500">
                   Tidak ada leads ditemukan
                 </TableCell>
               </TableRow>
@@ -306,11 +296,6 @@ export function LeadListView({ onLeadClick, refreshTrigger = 0 }: LeadListViewPr
                   </TableCell>
                   <TableCell>
                     {getStatusBadge(lead.status)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm font-semibold text-slate-900">
-                      {formatCurrency(lead.deal_value)}
-                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1 text-sm text-slate-600">
