@@ -266,8 +266,22 @@ export const db = {
         MOCK_LEADS.unshift(newLead);
         return newLead;
       }
+      
+      console.log("🔵 Supabase connected - attempting INSERT");
+      console.log("📊 Lead data to insert:", leadData);
+      
       const { data, error } = await supabase.from("leads").insert([leadData]).select().single();
-      if (error) throw error;
+      
+      if (error) {
+        console.error("❌ Supabase INSERT error:", error);
+        console.error("Error code:", error.code);
+        console.error("Error message:", error.message);
+        console.error("Error details:", error.details);
+        console.error("Error hint:", error.hint);
+        throw error;
+      }
+      
+      console.log("✅ Lead inserted successfully:", data);
       return data;
     },
 

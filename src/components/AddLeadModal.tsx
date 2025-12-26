@@ -145,13 +145,19 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         updated_at: new Date().toISOString()
       };
 
+      console.log("📤 Attempting to save lead:", leadData);
+
       if (editLead) {
-        await db.leads.update(editLead.id, leadData);
+        console.log("🔄 Updating existing lead:", editLead.id);
+        const result = await db.leads.update(editLead.id, leadData);
+        console.log("✅ Lead updated successfully:", result);
       } else {
-        await db.leads.create({
+        console.log("➕ Creating new lead");
+        const result = await db.leads.create({
           ...leadData,
           created_at: new Date().toISOString()
         });
+        console.log("✅ Lead created successfully:", result);
       }
       
       setFormData({
@@ -168,9 +174,21 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       
       onSuccess();
       onClose();
-    } catch (error) {
-      console.error("Error saving lead:", error);
-      alert("Gagal menyimpan lead. Silakan coba lagi.");
+    } catch (error: any) {
+      console.error("❌ Error saving lead:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        hint: error?.hint,
+        details: error?.details,
+        code: error?.code
+      });
+      
+      // Show detailed error to user
+      const errorMessage = error?.message || "Unknown error";
+      const errorHint = error?.hint ? `\n\nHint: ${error.hint}` : "";
+      const errorDetails = error?.details ? `\n\nDetails: ${error.details}` : "";
+      
+      alert(`❌ Gagal menyimpan lead!\n\nError: ${errorMessage}${errorHint}${errorDetails}\n\nSilakan check console browser (F12) untuk detail lengkap.`);
     } finally {
       setLoading(false);
     }
