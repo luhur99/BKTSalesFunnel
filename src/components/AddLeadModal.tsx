@@ -44,6 +44,20 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   useEffect(() => {
     if (isOpen && editLead) {
       console.log("🔵 EDIT MODE: Prepopulating form with lead data:", editLead);
+      console.log("🔑 CRITICAL ID VERIFICATION:");
+      console.log("  - Lead ID from prop:", editLead.id);
+      console.log("  - Lead Name:", editLead.name);
+      console.log("  - Source ID from lead:", editLead.source_id);
+      console.log("  - Stage ID from lead:", editLead.current_stage_id);
+      console.log("  - Available sources count:", sources.length);
+      console.log("  - Available stages count:", stages.length);
+      
+      // Verify IDs exist in loaded data
+      const sourceExists = sources.find(s => s.id === editLead.source_id);
+      const stageExists = stages.find(s => s.id === editLead.current_stage_id);
+      
+      console.log("  - Source found in dropdown?", sourceExists ? `YES (${sourceExists.name})` : "❌ NO!");
+      console.log("  - Stage found in dropdown?", stageExists ? `YES (${stageExists.stage_name})` : "❌ NO!");
       
       const prepopulatedData = {
         name: editLead.name || "",
@@ -61,6 +75,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       console.log("🔍 Checking fields:");
       console.log("  - Name:", editLead.name, "→", prepopulatedData.name);
       console.log("  - Phone:", editLead.phone, "→", prepopulatedData.phone);
+      console.log("  - Email:", editLead.email, "→", prepopulatedData.email);
+      console.log("  - Company:", editLead.company, "→", prepopulatedData.company);
       console.log("  - Source ID:", editLead.source_id, "→", prepopulatedData.source_id);
       console.log("  - Stage ID:", editLead.current_stage_id, "→", prepopulatedData.current_stage_id);
       console.log("  - Status:", editLead.status, "→", prepopulatedData.status);
@@ -166,11 +182,17 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       console.log("📤 Attempting to save lead:", leadData);
 
       if (editLead) {
-        console.log("🔄 Updating existing lead:", editLead.id);
+        console.log("🔄 UPDATE MODE:");
+        console.log("  - Target Lead ID:", editLead.id);
+        console.log("  - Lead Name:", editLead.name);
+        console.log("  - Updated Data:", leadData);
+        
         const result = await db.leads.update(editLead.id, leadData);
         console.log("✅ Lead updated successfully:", result);
       } else {
-        console.log("➕ Creating new lead");
+        console.log("➕ CREATE MODE:");
+        console.log("  - New Lead Data:", leadData);
+        
         const result = await db.leads.create({
           ...leadData,
           created_at: new Date().toISOString()

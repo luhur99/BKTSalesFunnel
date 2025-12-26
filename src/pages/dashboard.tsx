@@ -74,6 +74,11 @@ export default function Dashboard() {
   };
 
   const handleEditClick = (lead: Lead) => {
+    console.log("🖊️ EDIT BUTTON CLICKED:");
+    console.log("  - Lead ID:", lead.id);
+    console.log("  - Lead Name:", lead.name);
+    console.log("  - Full Lead Object:", lead);
+    
     setEditLead(lead);
     setIsAddLeadModalOpen(true);
   };
