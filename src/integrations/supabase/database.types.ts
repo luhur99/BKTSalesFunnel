@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -144,6 +144,7 @@ export type Database = {
           created_at: string | null
           current_funnel: Database["public"]["Enums"]["funnel_type"] | null
           current_stage_id: string | null
+          custom_labels: string[] | null
           deal_value: number | null
           email: string | null
           id: string
@@ -160,6 +161,7 @@ export type Database = {
           created_at?: string | null
           current_funnel?: Database["public"]["Enums"]["funnel_type"] | null
           current_stage_id?: string | null
+          custom_labels?: string[] | null
           deal_value?: number | null
           email?: string | null
           id?: string
@@ -176,6 +178,7 @@ export type Database = {
           created_at?: string | null
           current_funnel?: Database["public"]["Enums"]["funnel_type"] | null
           current_stage_id?: string | null
+          custom_labels?: string[] | null
           deal_value?: number | null
           email?: string | null
           id?: string
