@@ -130,13 +130,10 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       setStages(allStages);
       console.log("✅ Stages loaded:", allStages.length, "(Follow-up:", followUpStages.length, "+ Broadcast:", broadcastStages.length, ")");
       
-      // Load available labels from localStorage (Settings → Custom Labels)
-      const storedLabels = localStorage.getItem("customLabels");
-      if (storedLabels) {
-        const labels = JSON.parse(storedLabels);
-        setAvailableLabels(labels.map((l: any) => l.name));
-        console.log("✅ Custom labels loaded:", labels.length);
-      }
+      // Load available labels from database (Settings → Custom Labels)
+      const customLabels = await db.customLabels.getAll();
+      setAvailableLabels(customLabels.map((l: any) => l.name));
+      console.log("✅ Custom labels loaded from database:", customLabels.length);
     } catch (error) {
       console.error("❌ Error loading data:", error);
     }

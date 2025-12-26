@@ -18,13 +18,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Tag, Star, Zap, Flag, Heart, AlertCircle } from "lucide-react";
+import { Plus, Edit, Trash2, Tag, Star, Zap, Flag, Heart, AlertCircle, Loader2 } from "lucide-react";
+import { db } from "@/lib/supabase";
 
 interface CustomLabel {
   id: string;
   name: string;
   color: string;
   icon: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const ICON_OPTIONS = [
@@ -48,11 +51,9 @@ const COLOR_OPTIONS = [
 ];
 
 export function CustomLabelsManager() {
-  const [labels, setLabels] = useState<CustomLabel[]>([
-    { id: "1", name: "VIP", color: "purple", icon: "star" },
-    { id: "2", name: "Hot Lead", color: "red", icon: "zap" },
-    { id: "3", name: "Follow Up Urgent", color: "orange", icon: "flag" },
-  ]);
+  const [labels, setLabels] = useState<CustomLabel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState<CustomLabel | null>(null);
   const [formData, setFormData] = useState({
@@ -61,29 +62,57 @@ export function CustomLabelsManager() {
     icon: "tag",
   });
 
-  const handleSave = () => {
-    if (!formData.name.trim()) return;
+  useEffect(() => {
+    loadLabels();
+  }, []);
 
-    if (editingLabel) {
-      setLabels(labels.map((l) => (l.id === editingLabel.id ? { ...editingLabel, ...formData } : l)));
-    } else {
-      const newLabel: CustomLabel = {
-        id: Date.now().toString(),
-        name: formData.name,
-        color: formData.color,
-        icon: formData.icon,
-      };
-      setLabels([...labels, newLabel]);
+  const loadLabels = async () => {
+    try {
+      setLoading(true);
+      const data = await db.customLabels.getAll();
+      setLabels(data);
+    } catch (error) {
+      console.error("Error loading custom labels:", error);
+      alert("Gagal memuat custom labels");
+    } finally {
+      setLoading(false);
     }
-
-    setIsDialogOpen(false);
-    setEditingLabel(null);
-    setFormData({ name: "", color: "blue", icon: "tag" });
   };
 
-  const handleDelete = (labelId: string) => {
+  const handleSave = async () => {
+    if (!formData.name.trim()) return;
+
+    try {
+      setSaving(true);
+
+      if (editingLabel) {
+        await db.customLabels.update(editingLabel.id, formData);
+      } else {
+        await db.customLabels.create(formData);
+      }
+
+      await loadLabels();
+      setIsDialogOpen(false);
+      setEditingLabel(null);
+      setFormData({ name: "", color: "blue", icon: "tag" });
+    } catch (error) {
+      console.error("Error saving custom label:", error);
+      alert("Gagal menyimpan custom label");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (labelId: string) => {
     if (!confirm("Yakin ingin menghapus label ini?")) return;
-    setLabels(labels.filter((l) => l.id !== labelId));
+
+    try {
+      await db.customLabels.delete(labelId);
+      await loadLabels();
+    } catch (error) {
+      console.error("Error deleting custom label:", error);
+      alert("Gagal menghapus custom label");
+    }
   };
 
   const openEditDialog = (label: CustomLabel) => {
@@ -105,6 +134,15 @@ export function CustomLabelsManager() {
     const colorOption = COLOR_OPTIONS.find((c) => c.value === colorValue);
     return colorOption ? colorOption.class : "bg-blue-500";
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="w-6 h-6 animate-spin" />
+        <span className="ml-2">Loading custom labels...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -262,8 +300,15 @@ export function CustomLabelsManager() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleSave} disabled={!formData.name.trim()}>
-              {editingLabel ? "Update" : "Simpan"}
+            <Button onClick={handleSave} disabled={!formData.name.trim() || saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                editingLabel ? "Update" : "Simpan"
+              )}
             </Button>
           </div>
         </DialogContent>
