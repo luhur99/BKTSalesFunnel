@@ -1,15 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Layers, FileText, Tag, User } from "lucide-react";
+import { ArrowLeft, Layers, FileText, Tag, User, Loader2 } from "lucide-react";
 import { FunnelStagesManager } from "@/components/settings/FunnelStagesManager";
 import { ScriptTemplatesManager } from "@/components/settings/ScriptTemplatesManager";
 import { CustomLabelsManager } from "@/components/settings/CustomLabelsManager";
 import { ProfileSecurity } from "@/components/settings/ProfileSecurity";
+import { authService } from "@/services/authService";
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user) {
+        console.log("❌ Not authenticated, redirecting to login...");
+        router.push("/login");
+        return;
+      }
+      console.log("✅ User authenticated:", user.email);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error("❌ Auth check error:", error);
+      router.push("/login");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+          <p className="text-muted-foreground">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render settings if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <>
       <Head>

@@ -95,9 +95,15 @@ export function CustomLabelsManager() {
       setIsDialogOpen(false);
       setEditingLabel(null);
       setFormData({ name: "", color: "blue", icon: "tag" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving custom label:", error);
-      alert("Gagal menyimpan custom label");
+      
+      // Check if it's an RLS/auth error
+      if (error?.code === "42501" || error?.message?.includes("row-level security")) {
+        alert("❌ Authentication error: Silakan login kembali untuk menyimpan label.");
+      } else {
+        alert("Gagal menyimpan custom label: " + (error?.message || "Unknown error"));
+      }
     } finally {
       setSaving(false);
     }
@@ -109,9 +115,15 @@ export function CustomLabelsManager() {
     try {
       await db.customLabels.delete(labelId);
       await loadLabels();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting custom label:", error);
-      alert("Gagal menghapus custom label");
+      
+      // Check if it's an RLS/auth error
+      if (error?.code === "42501" || error?.message?.includes("row-level security")) {
+        alert("❌ Authentication error: Silakan login kembali untuk menghapus label.");
+      } else {
+        alert("Gagal menghapus custom label: " + (error?.message || "Unknown error"));
+      }
     }
   };
 
