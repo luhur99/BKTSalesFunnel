@@ -70,7 +70,7 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
     };
   };
 
-  const [stats, setStats] = useState({ totalEntered: 0, totalProgressed: 0, totalStuck: 0, lostLeadsCount: 0 });
+  const [stats, setStats] = useState({ totalEntered: 0, totalProgressing: 0, totalStuck: 0, lostLeadsCount: 0 });
 
   useEffect(() => {
     getOverallStats().then(setStats);
