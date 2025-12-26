@@ -19,6 +19,8 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState({
     total_leads: 0,
     active_leads: 0,
+    leads_progressing: 0,
+    leads_stuck: 0,
     deals_closed: 0,
     lost_leads: 0,
     follow_up_leads: 0,
@@ -169,7 +171,7 @@ export default function Dashboard() {
             <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Total Leads</CardDescription>
+                  <CardDescription className="text-slate-600 font-medium">Total Leads Masuk</CardDescription>
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                     <Users className="w-5 h-5 text-blue-600" />
                   </div>
@@ -177,27 +179,6 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.total_leads}</div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                    <TrendingUp className="w-3 h-3" />
-                    <span className="font-semibold">+12%</span>
-                  </div>
-                  <span className="text-slate-500">vs bulan lalu</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Leads Aktif</CardDescription>
-                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-emerald-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.active_leads}</div>
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -207,6 +188,40 @@ export default function Dashboard() {
                     <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                     <span className="text-slate-600"><strong>{metrics.broadcast_leads}</strong> Broadcast</span>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardDescription className="text-slate-600 font-medium">Leads Progressing</CardDescription>
+                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.leads_progressing}</div>
+                <div className="text-sm text-slate-600">
+                  <span>Bergerak dalam <strong>7 hari terakhir</strong></span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardDescription className="text-slate-600 font-medium">Leads Stuck</CardDescription>
+                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-orange-600" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.leads_stuck}</div>
+                <div className="text-sm text-slate-600">
+                  <span>Tidak bergerak <strong>7+ hari</strong></span>
                 </div>
               </CardContent>
             </Card>
@@ -226,44 +241,6 @@ export default function Dashboard() {
                   <span className="font-bold text-green-600">{metrics.conversion_rate.toFixed(1)}%</span>
                   <span className="ml-1">tingkat konversi</span>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Top Bottlenecks</CardDescription>
-                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {bottlenecks.length > 0 ? (
-                  <div className="space-y-3">
-                    {bottlenecks.map((bn, idx) => (
-                      <div key={bn.stage_id} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-semibold text-slate-700 truncate">
-                            {bn.stage_name}
-                          </div>
-                          <Badge className="bg-red-100 text-red-700 text-xs">
-                            {bn.conversion_rate.toFixed(0)}%
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <span>{bn.leads_stuck} stuck</span>
-                          <span>•</span>
-                          <span className="capitalize">{bn.funnel_type.replace("_", " ")}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-500 text-center py-4">
-                    Tidak ada bottleneck terdeteksi
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>

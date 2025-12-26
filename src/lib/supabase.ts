@@ -312,6 +312,8 @@ export const db = {
         return {
           total_leads: total,
           active_leads: active,
+          leads_progressing: active,
+          leads_stuck: 0,
           deals_closed: deal,
           lost_leads: lost,
           follow_up_leads: fu,
@@ -321,15 +323,58 @@ export const db = {
         };
       }
       
-      const { data: leads } = await supabase.from("leads").select("status, current_funnel");
-      if (!leads) return { total_leads: 0, active_leads: 0, deals_closed: 0, lost_leads: 0, follow_up_leads: 0, broadcast_leads: 0, conversion_rate: 0, total_deal_value: 0 };
+      // Get all leads with their stage movement history
+      const { data: leads } = await supabase
+        .from("leads")
+        .select(`
+          id,
+          status,
+          current_funnel,
+          updated_at,
+          current_stage_id
+        `);
+      
+      if (!leads) {
+        return { 
+          total_leads: 0, 
+          active_leads: 0,
+          leads_progressing: 0,
+          leads_stuck: 0,
+          deals_closed: 0, 
+          lost_leads: 0, 
+          follow_up_leads: 0, 
+          broadcast_leads: 0, 
+          conversion_rate: 0, 
+          total_deal_value: 0 
+        };
+      }
+
+      // Get recent stage movements (last 7 days) to identify progressing leads
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const { data: recentMovements } = await supabase
+        .from("lead_stage_history")
+        .select("lead_id")
+        .gte("moved_at", sevenDaysAgo.toISOString());
+      
+      const recentlyMovedLeadIds = new Set(recentMovements?.map(m => m.lead_id) || []);
 
       const total = leads.length;
+      const activeLeads = leads.filter(l => l.status === "active");
       const deal = leads.filter(l => l.status === "deal").length;
+      
+      // Leads progressing = active leads that moved in last 7 days
+      const progressing = activeLeads.filter(l => recentlyMovedLeadIds.has(l.id)).length;
+      
+      // Leads stuck = active leads that haven't moved in 7+ days
+      const stuck = activeLeads.filter(l => !recentlyMovedLeadIds.has(l.id)).length;
       
       return {
         total_leads: total,
-        active_leads: leads.filter(l => l.status === "active").length,
+        active_leads: activeLeads.length,
+        leads_progressing: progressing,
+        leads_stuck: stuck,
         deals_closed: deal,
         lost_leads: leads.filter(l => l.status === "lost").length,
         follow_up_leads: leads.filter(l => l.current_funnel === "follow_up" && l.status === "active").length,
