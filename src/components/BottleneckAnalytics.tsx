@@ -38,8 +38,10 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
   };
 
   const getConversionBadge = (rate: number) => {
-    if (rate >= 70) return { color: "bg-green-100 text-green-700 border-green-200", icon: TrendingUp };
-    if (rate >= 50) return { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: TrendingUp };
+    // Cap at 100% for display (data quality issue if > 100%)
+    const displayRate = Math.min(rate, 100);
+    if (displayRate >= 70) return { color: "bg-green-100 text-green-700 border-green-200", icon: TrendingUp };
+    if (displayRate >= 50) return { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: TrendingUp };
     return { color: "bg-red-100 text-red-700 border-red-200", icon: TrendingDown };
   };
 
@@ -57,15 +59,15 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
   };
 
   const getOverallStats = async () => {
-    const totalEntered = analytics.reduce((sum, s) => sum + s.leads_entered, 0);
-    const totalProgressed = analytics.reduce((sum, s) => sum + s.leads_progressed, 0);
-    const totalStuck = analytics.reduce((sum, s) => sum + s.leads_stuck, 0);
-    
-    // Get lost leads count from database stats (more efficient)
+    // Get stats directly from database - more reliable than summing analytics
     const stats = await db.leads.getStats();
-    const lostLeadsCount = stats.lost_leads;
-
-    return { totalEntered, totalProgressed, totalStuck, lostLeadsCount };
+    
+    return { 
+      totalEntered: stats.total_leads,
+      totalProgressing: stats.leads_progressing,
+      totalStuck: stats.leads_stuck,
+      lostLeadsCount: stats.lost_leads
+    };
   };
 
   const [stats, setStats] = useState({ totalEntered: 0, totalProgressed: 0, totalStuck: 0, lostLeadsCount: 0 });
@@ -111,7 +113,7 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-600 mb-1">Leads Progressing</p>
-                <p className="text-3xl font-bold text-green-600">{stats.totalProgressed}</p>
+                <p className="text-3xl font-bold text-green-600">{stats.totalProgressing}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-green-600" />
@@ -149,6 +151,17 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
         </Card>
       </div>
 
+      {/* Data Quality Warning */}
+      {analytics.some(s => s.conversion_rate > 100) && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <AlertTriangle className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Info:</strong> Beberapa stage menunjukkan konversi &gt;100% karena lead berpindah bolak-balik antar stage saat testing. 
+            Metrics ditampilkan berdasarkan kondisi real-time untuk akurasi.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Bottleneck Alerts */}
       {bottlenecks.length > 0 && (
         <Alert className="border-red-200 bg-red-50">
@@ -178,6 +191,9 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
               {bottlenecks.map((stage) => {
                 const badge = getConversionBadge(stage.conversion_rate);
                 const Icon = badge.icon;
+                const displayRate = Math.min(stage.conversion_rate, 100); // Cap at 100%
+                const hasAnomaly = stage.conversion_rate > 100;
+                
                 return (
                   <div key={stage.stage_id} className="p-4 border border-slate-200 rounded-lg hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
@@ -189,6 +205,11 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
                           <Badge className="text-xs bg-slate-100 text-slate-700 border-slate-200">
                             {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} #{stage.stage_number}
                           </Badge>
+                          {hasAnomaly && (
+                            <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                              Data Testing
+                            </Badge>
+                          )}
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 mt-3">
@@ -210,13 +231,13 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
                       <div className="text-right ml-4">
                         <Badge className={`${badge.color} border mb-2`}>
                           <Icon className="w-3 h-3 mr-1" />
-                          {stage.conversion_rate.toFixed(1)}%
+                          {displayRate.toFixed(1)}%
                         </Badge>
                         <p className="text-xs text-slate-500">Conversion</p>
                       </div>
                     </div>
                     
-                    <Progress value={stage.conversion_rate} className="h-2" />
+                    <Progress value={displayRate} className="h-2" />
                   </div>
                 );
               })}
@@ -278,6 +299,9 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
             {analytics.map((stage) => {
               const badge = getConversionBadge(stage.conversion_rate);
               const Icon = badge.icon;
+              const displayRate = Math.min(stage.conversion_rate, 100);
+              const hasAnomaly = stage.conversion_rate > 100;
+              
               return (
                 <div key={stage.stage_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                   <div className="flex-1">
@@ -286,6 +310,11 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
                       <Badge className="text-xs bg-slate-100 text-slate-700">
                         {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} #{stage.stage_number}
                       </Badge>
+                      {hasAnomaly && (
+                        <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">
+                          Testing Data
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-6 text-sm">
                       <span className="text-slate-600">
@@ -301,7 +330,7 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
                   </div>
                   <Badge className={`${badge.color} border`}>
                     <Icon className="w-3 h-3 mr-1" />
-                    {stage.conversion_rate.toFixed(1)}%
+                    {displayRate.toFixed(1)}%
                   </Badge>
                 </div>
               );
