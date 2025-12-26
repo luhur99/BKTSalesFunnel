@@ -473,9 +473,21 @@ export const db = {
       if (!isConnected) {
         return MOCK_SCRIPTS.find(s => s.stage_id === stageId) || null;
       }
-      const { data, error } = await supabase.from("stage_scripts").select("*").eq("stage_id", stageId).single();
-      if (error) return null;
-      return data;
+      
+      // ✅ FIX: Remove .single() to handle 0 or multiple results
+      const { data, error } = await supabase
+        .from("stage_scripts")
+        .select("*")
+        .eq("stage_id", stageId)
+        .limit(1);  // Only get first result for performance
+      
+      if (error) {
+        console.error("❌ Error fetching script for stage:", error);
+        return null;
+      }
+      
+      // Return first item or null if array is empty
+      return data && data.length > 0 ? data[0] : null;
     },
     create: async (scriptData: { stage_id: string; script_text: string; media_links?: string[]; image_url?: string | null; video_url?: string | null }) => {
       if (!isConnected) {
