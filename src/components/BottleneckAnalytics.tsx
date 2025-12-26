@@ -61,9 +61,9 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
     const totalProgressed = analytics.reduce((sum, s) => sum + s.leads_progressed, 0);
     const totalStuck = analytics.reduce((sum, s) => sum + s.leads_stuck, 0);
     
-    // Get lost leads count from database
-    const allLeads = await db.leads.getAll();
-    const lostLeadsCount = allLeads.filter(lead => lead.status === "lost").length;
+    // Get lost leads count from database stats (more efficient)
+    const stats = await db.leads.getStats();
+    const lostLeadsCount = stats.lost_leads;
 
     return { totalEntered, totalProgressed, totalStuck, lostLeadsCount };
   };

@@ -355,7 +355,54 @@ export const db = {
         return;
       }
 
-      // Real implementation would go here (RPC call or manual transaction)
+      // Real implementation with Supabase transaction
+      try {
+        // Get current lead info
+        const { data: lead, error: leadError } = await supabase
+          .from("leads")
+          .select("current_stage_id, current_funnel")
+          .eq("id", leadId)
+          .single();
+        
+        if (leadError) throw leadError;
+
+        // Get target stage info
+        const { data: toStage, error: stageError } = await supabase
+          .from("stages")
+          .select("funnel_type, stage_number")
+          .eq("id", toStageId)
+          .single();
+        
+        if (stageError) throw stageError;
+
+        // Create history record
+        await supabase.from("lead_stage_history").insert([{
+          lead_id: leadId,
+          from_stage_id: lead.current_stage_id,
+          to_stage_id: toStageId,
+          from_funnel: lead.current_funnel,
+          to_funnel: toStage.funnel_type,
+          reason,
+          notes,
+          moved_by: userId,
+          moved_at: new Date().toISOString()
+        }]);
+
+        // Update lead
+        await supabase
+          .from("leads")
+          .update({
+            current_stage_id: toStageId,
+            current_funnel: toStage.funnel_type,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", leadId);
+
+        // Check if moved to stage 10 broadcast -> auto LOST (handled by trigger)
+      } catch (error) {
+        console.error("Error moving lead to stage:", error);
+        throw error;
+      }
     }
   },
 

@@ -71,47 +71,9 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
 
   const loadData = async () => {
     try {
-      // Load sources - use predefined sources: Facebook Ads, Google Ads, Social Media, Offline, Manual
-      const predefinedSources: LeadSource[] = [
-        { 
-          id: "facebook-ads", 
-          name: "Facebook Ads", 
-          type: "system", 
-          created_at: new Date().toISOString(), 
-          updated_at: new Date().toISOString() 
-        },
-        { 
-          id: "google-ads", 
-          name: "Google Ads", 
-          type: "system", 
-          created_at: new Date().toISOString(), 
-          updated_at: new Date().toISOString() 
-        },
-        { 
-          id: "social-media", 
-          name: "Social Media", 
-          type: "system", 
-          created_at: new Date().toISOString(), 
-          updated_at: new Date().toISOString() 
-        },
-        { 
-          id: "offline", 
-          name: "Offline", 
-          type: "system", 
-          created_at: new Date().toISOString(), 
-          updated_at: new Date().toISOString() 
-        },
-        { 
-          id: "manual", 
-          name: "Manual", 
-          type: "system", 
-          created_at: new Date().toISOString(), 
-          updated_at: new Date().toISOString() 
-        }
-      ];
-      
+      // Load sources from database
       const sourcesData = await db.sources.getAll();
-      setSources(sourcesData.length > 0 ? sourcesData : predefinedSources);
+      setSources(sourcesData);
       
       const stagesData = await db.stages.getByFunnel("follow_up");
       setStages(stagesData);
