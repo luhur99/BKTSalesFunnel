@@ -52,6 +52,12 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       console.log("  - Available sources count:", sources.length);
       console.log("  - Available stages count:", stages.length);
       
+      // CRITICAL: Only prepopulate if sources and stages are loaded
+      if (sources.length === 0 || stages.length === 0) {
+        console.log("⏳ Waiting for sources and stages to load before prepopulation...");
+        return;
+      }
+      
       // Verify IDs exist in loaded data
       const sourceExists = sources.find(s => s.id === editLead.source_id);
       const stageExists = stages.find(s => s.id === editLead.current_stage_id);
@@ -111,9 +117,18 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       setSources(sourcesData);
       console.log("✅ Sources loaded:", sourcesData.length);
       
-      const stagesData = await db.stages.getByFunnel("follow_up");
-      setStages(stagesData);
-      console.log("✅ Stages loaded:", stagesData.length);
+      // Load ALL stages (both follow-up and broadcast) for editing
+      const followUpStages = await db.stages.getByFunnel("follow_up");
+      const broadcastStages = await db.stages.getByFunnel("broadcast");
+      const allStages = [...followUpStages, ...broadcastStages].sort((a, b) => {
+        // Sort by funnel first, then by stage_number
+        if (a.funnel_type !== b.funnel_type) {
+          return a.funnel_type === "follow_up" ? -1 : 1;
+        }
+        return a.stage_number - b.stage_number;
+      });
+      setStages(allStages);
+      console.log("✅ Stages loaded:", allStages.length, "(Follow-up:", followUpStages.length, "+ Broadcast:", broadcastStages.length, ")");
       
       // Load available labels from localStorage (Settings → Custom Labels)
       const storedLabels = localStorage.getItem("customLabels");
@@ -343,7 +358,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                   <SelectContent>
                     {stages.map((stage) => (
                       <SelectItem key={stage.id} value={stage.id}>
-                        {stage.stage_number}. {stage.stage_name}
+                        [{stage.funnel_type === "follow_up" ? "F" : "B"}] {stage.stage_number}. {stage.stage_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
