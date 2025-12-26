@@ -44,7 +44,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   useEffect(() => {
     if (isOpen && editLead) {
       console.log("🔵 EDIT MODE: Prepopulating form with lead data:", editLead);
-      setFormData({
+      
+      const prepopulatedData = {
         name: editLead.name || "",
         email: editLead.email || "",
         phone: editLead.phone || "",
@@ -54,7 +55,21 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         status: editLead.status || "active",
         custom_labels: Array.isArray(editLead.custom_labels) ? editLead.custom_labels : [],
         notes: editLead.last_response_note || ""
-      });
+      };
+      
+      console.log("📝 Prepopulated form data:", prepopulatedData);
+      console.log("🔍 Checking fields:");
+      console.log("  - Name:", editLead.name, "→", prepopulatedData.name);
+      console.log("  - Phone:", editLead.phone, "→", prepopulatedData.phone);
+      console.log("  - Source ID:", editLead.source_id, "→", prepopulatedData.source_id);
+      console.log("  - Stage ID:", editLead.current_stage_id, "→", prepopulatedData.current_stage_id);
+      console.log("  - Status:", editLead.status, "→", prepopulatedData.status);
+      console.log("  - Custom Labels:", editLead.custom_labels, "→", prepopulatedData.custom_labels);
+      console.log("  - Notes:", editLead.last_response_note, "→", prepopulatedData.notes);
+      
+      setFormData(prepopulatedData);
+      
+      console.log("✅ Form data set complete");
     } else if (isOpen && !editLead) {
       console.log("🆕 CREATE MODE: Resetting form to default values");
       setFormData({
@@ -278,7 +293,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="source">
+                <Label>
                   Lead Source <span className="text-red-500">*</span>
                 </Label>
                 <Select value={formData.source_id} onValueChange={(v) => setFormData({ ...formData, source_id: v })}>
@@ -296,7 +311,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="stage">
+                <Label>
                   Initial Stage <span className="text-red-500">*</span>
                 </Label>
                 <Select value={formData.current_stage_id} onValueChange={(v) => setFormData({ ...formData, current_stage_id: v })}>
@@ -314,7 +329,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">
+                <Label>
                   Status <span className="text-red-500">*</span>
                 </Label>
                 <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
@@ -364,10 +379,10 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="labels">Atau Tambah Label Baru</Label>
+              <Label htmlFor="label-input">Atau Tambah Label Baru</Label>
               <div className="flex gap-2">
                 <Input
-                  id="labels"
+                  id="label-input"
                   placeholder="Contoh: VIP, Hot Lead, Follow Up Urgent..."
                   value={labelInput}
                   onChange={(e) => setLabelInput(e.target.value)}
