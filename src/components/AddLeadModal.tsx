@@ -43,6 +43,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
 
   useEffect(() => {
     if (isOpen && editLead) {
+      console.log("🔵 EDIT MODE: Prepopulating form with lead data:", editLead);
       setFormData({
         name: editLead.name || "",
         email: editLead.email || "",
@@ -51,45 +52,47 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         source_id: editLead.source_id || "",
         current_stage_id: editLead.current_stage_id || "",
         status: editLead.status || "active",
-        custom_labels: editLead.custom_labels || [],
+        custom_labels: Array.isArray(editLead.custom_labels) ? editLead.custom_labels : [],
         notes: editLead.last_response_note || ""
       });
     } else if (isOpen && !editLead) {
+      console.log("🆕 CREATE MODE: Resetting form to default values");
       setFormData({
         name: "",
         email: "",
         phone: "",
         company: "",
-        source_id: "",
-        current_stage_id: stages[0]?.id || "",
+        source_id: sources.length > 0 ? sources[0].id : "",
+        current_stage_id: stages.length > 0 ? stages[0].id : "",
         status: "active",
         custom_labels: [],
         notes: ""
       });
     }
-  }, [isOpen, editLead, stages]);
+  }, [isOpen, editLead, stages, sources]);
 
   const loadData = async () => {
     try {
+      console.log("📊 Loading sources and stages...");
+      
       // Load sources from database
       const sourcesData = await db.sources.getAll();
       setSources(sourcesData);
+      console.log("✅ Sources loaded:", sourcesData.length);
       
       const stagesData = await db.stages.getByFunnel("follow_up");
       setStages(stagesData);
+      console.log("✅ Stages loaded:", stagesData.length);
       
       // Load available labels from localStorage (Settings → Custom Labels)
       const storedLabels = localStorage.getItem("customLabels");
       if (storedLabels) {
         const labels = JSON.parse(storedLabels);
         setAvailableLabels(labels.map((l: any) => l.name));
-      }
-      
-      if (stagesData.length > 0 && !formData.current_stage_id && !editLead) {
-        setFormData(prev => ({ ...prev, current_stage_id: stagesData[0].id }));
+        console.log("✅ Custom labels loaded:", labels.length);
       }
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("❌ Error loading data:", error);
     }
   };
 
