@@ -270,6 +270,29 @@ export const db = {
       console.log("🔵 Supabase connected - attempting INSERT");
       console.log("📊 Lead data to insert:", leadData);
       
+      // Validate required fields before INSERT
+      if (!leadData.phone) {
+        const error = new Error("Phone number is required");
+        console.error("❌ VALIDATION ERROR:", error.message);
+        throw error;
+      }
+      
+      if (!leadData.source_id) {
+        const error = new Error("Lead source is required");
+        console.error("❌ VALIDATION ERROR:", error.message);
+        throw error;
+      }
+      
+      if (!leadData.current_stage_id) {
+        const error = new Error("Current stage is required");
+        console.error("❌ VALIDATION ERROR:", error.message);
+        throw error;
+      }
+      
+      console.log("✅ Validation passed, attempting Supabase INSERT...");
+      console.log("🔑 Using Supabase URL:", supabaseUrl);
+      console.log("🔑 Anon key present:", !!supabaseKey);
+      
       const { data, error } = await supabase.from("leads").insert([leadData]).select().single();
       
       if (error) {
@@ -278,7 +301,14 @@ export const db = {
         console.error("Error message:", error.message);
         console.error("Error details:", error.details);
         console.error("Error hint:", error.hint);
-        throw error;
+        
+        // Enhanced error message for users
+        const userMessage = `Failed to save lead: ${error.message}${error.hint ? `\n\nHint: ${error.hint}` : ''}${error.details ? `\n\nDetails: ${error.details}` : ''}`;
+        const enhancedError = new Error(userMessage);
+        (enhancedError as any).code = error.code;
+        (enhancedError as any).details = error.details;
+        (enhancedError as any).hint = error.hint;
+        throw enhancedError;
       }
       
       console.log("✅ Lead inserted successfully:", data);

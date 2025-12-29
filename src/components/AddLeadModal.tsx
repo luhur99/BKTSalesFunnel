@@ -192,6 +192,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       };
 
       console.log("📤 Attempting to save lead:", leadData);
+      console.log("🌐 Current URL:", window.location.href);
+      console.log("🔧 User Agent:", navigator.userAgent);
 
       if (editLead) {
         console.log("🔄 UPDATE MODE:");
@@ -228,19 +230,40 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       onClose();
     } catch (error: any) {
       console.error("❌ Error saving lead:", error);
+      console.error("Error stack:", error?.stack);
       console.error("Error details:", {
+        name: error?.name,
         message: error?.message,
+        code: error?.code,
         hint: error?.hint,
-        details: error?.details,
-        code: error?.code
+        details: error?.details
       });
       
-      // Show detailed error to user
+      // Network error detection
+      if (error?.message?.includes("fetch") || error?.message?.includes("network")) {
+        alert(`❌ Network Error!\n\nCannot connect to database. Please check:\n\n1. Internet connection\n2. Firewall/proxy settings\n3. VPN if applicable\n\nTechnical details:\n${error.message}`);
+        return;
+      }
+      
+      // CORS error detection
+      if (error?.message?.includes("CORS") || error?.code === "PGRST301") {
+        alert(`❌ CORS Error!\n\nCannot access database from this domain.\n\nPlease contact administrator to whitelist:\n${window.location.origin}\n\nTechnical details:\n${error.message}`);
+        return;
+      }
+      
+      // Authentication error detection
+      if (error?.code === "PGRST301" || error?.message?.includes("JWT")) {
+        alert(`❌ Authentication Error!\n\nInvalid API key or expired session.\n\nPlease contact administrator.\n\nTechnical details:\n${error.message}`);
+        return;
+      }
+      
+      // Generic error with full details
       const errorMessage = error?.message || "Unknown error";
       const errorHint = error?.hint ? `\n\nHint: ${error.hint}` : "";
       const errorDetails = error?.details ? `\n\nDetails: ${error.details}` : "";
+      const errorCode = error?.code ? `\n\nError Code: ${error.code}` : "";
       
-      alert(`❌ Gagal menyimpan lead!\n\nError: ${errorMessage}${errorHint}${errorDetails}\n\nSilakan check console browser (F12) untuk detail lengkap.`);
+      alert(`❌ Gagal menyimpan lead!\n\n${errorMessage}${errorHint}${errorDetails}${errorCode}\n\n⚠️ DEBUGGING INFO:\n- Check browser console (F12) for full error details\n- Screenshot this message and send to admin`);
     } finally {
       setLoading(false);
     }
