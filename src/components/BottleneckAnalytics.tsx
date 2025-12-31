@@ -46,14 +46,11 @@ export function BottleneckAnalytics({ key, refreshTrigger }: BottleneckAnalytics
     try {
       const leads = await db.leads.getAll();
       
-      // Group by source - ENSURE source is always a string
+      // ✅ FIX: Convert null/undefined to "Unknown" and ensure it's a string
       const sourceMap = new Map<string, number>();
       leads.forEach(lead => {
-        // ✅ FIX: Convert null/undefined to "Unknown" and ensure it's a string
-        const source = lead.source && typeof lead.source === "string" 
-          ? lead.source 
-          : "Unknown";
-        sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+        const sourceName = lead.source?.name || "Unknown";
+        sourceMap.set(sourceName, (sourceMap.get(sourceName) || 0) + 1);
       });
       
       // Calculate percentages
