@@ -39,6 +39,13 @@ interface MonthlyAnalytics {
   monthlyDeals: number;
   monthlyLeads: number;
   month: string;
+  lastMonthDeals: number;
+  lastMonthLeads: number;
+  conversionRate: number;
+  lastMonthConversionRate: number;
+  topSources: { source: string; deals: number; percentage: number }[];
+  leadsGrowth: number;
+  dealsGrowth: number;
 }
 
 export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps) {
@@ -587,36 +594,145 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
               <p className="text-sm text-slate-500 text-center py-4">Loading...</p>
             ) : (
               <>
-                {/* Month */}
+                {/* 1. Weekly Deals Trend */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-slate-600">📅 Bulan</p>
+                    <p className="text-xs font-medium text-slate-600">📈 Trend Deals Mingguan</p>
                     <span className="text-xs text-slate-500">{monthlyAnalytics.month}</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div>
-                      <p className="text-lg font-bold text-green-900">{monthlyAnalytics.monthlyDeals}</p>
-                      <p className="text-xs text-green-600">Deals closed</p>
-                    </div>
-                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-white" />
-                    </div>
+                  <div className="space-y-2 bg-slate-50 p-3 rounded-lg">
+                    {monthlyAnalytics.weeklyDeals.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center">Belum ada deals bulan ini</p>
+                    ) : (
+                      <>
+                        {monthlyAnalytics.weeklyDeals.map((week) => {
+                          const maxDeals = Math.max(...monthlyAnalytics.weeklyDeals.map(w => w.count));
+                          const barWidth = maxDeals > 0 ? (week.count / maxDeals) * 100 : 0;
+                          return (
+                            <div key={week.week} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-600 font-medium">Week {week.week}</span>
+                                <span className="text-slate-900 font-semibold">{week.count} deals</span>
+                              </div>
+                              <div className="relative h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                  className="absolute top-0 left-0 h-full bg-green-500 transition-all duration-500"
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="pt-2 mt-2 border-t border-slate-300">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-700">Total Deals:</span>
+                            <span className="font-bold text-green-600">{monthlyAnalytics.monthlyDeals}</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                {/* Leads */}
+                {/* 2. Conversion Rate Comparison */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-slate-600">👥 Leads Masuk</p>
-                    <span className="text-xs text-slate-500">{monthlyAnalytics.monthlyLeads}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div>
-                      <p className="text-lg font-bold text-blue-900">{monthlyAnalytics.monthlyLeads}</p>
-                      <p className="text-xs text-blue-600">Leads masuk</p>
+                  <p className="text-xs font-medium text-slate-600">💯 Tingkat Konversi Bulanan</p>
+                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600">Bulan Ini:</span>
+                      <span className="text-lg font-bold text-blue-900">{monthlyAnalytics.conversionRate.toFixed(1)}%</span>
                     </div>
-                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <UserPlus className="w-5 h-5 text-white" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600">Bulan Lalu:</span>
+                      <span className="text-sm font-semibold text-slate-700">{monthlyAnalytics.lastMonthConversionRate.toFixed(1)}%</span>
+                    </div>
+                    {monthlyAnalytics.lastMonthConversionRate > 0 && (
+                      <div className="pt-2 border-t border-blue-300">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-slate-600">Growth:</span>
+                          <span className={`text-sm font-bold ${
+                            monthlyAnalytics.conversionRate > monthlyAnalytics.lastMonthConversionRate 
+                              ? "text-green-600" 
+                              : monthlyAnalytics.conversionRate < monthlyAnalytics.lastMonthConversionRate
+                              ? "text-red-600"
+                              : "text-slate-600"
+                          }`}>
+                            {monthlyAnalytics.conversionRate > monthlyAnalytics.lastMonthConversionRate ? "↑" : 
+                             monthlyAnalytics.conversionRate < monthlyAnalytics.lastMonthConversionRate ? "↓" : "→"}
+                            {" "}
+                            {(monthlyAnalytics.conversionRate - monthlyAnalytics.lastMonthConversionRate).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Top 3 Lead Sources */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-600">🏆 Top 3 Lead Source (Deals)</p>
+                  <div className="space-y-2">
+                    {monthlyAnalytics.topSources.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-2">Belum ada deals dari source manapun</p>
+                    ) : (
+                      monthlyAnalytics.topSources.map((source, index) => {
+                        const medals = ["🥇", "🥈", "🥉"];
+                        const colors = ["text-yellow-600", "text-slate-400", "text-orange-600"];
+                        return (
+                          <div key={source.source} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{medals[index]}</span>
+                              <span className={`text-xs font-medium ${colors[index]}`}>{source.source}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-sm font-bold text-slate-900">{source.deals} deals</span>
+                              <span className="text-xs text-slate-500 ml-2">({source.percentage.toFixed(1)}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Month-over-Month Comparison */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-600">📊 Perbandingan dengan Bulan Lalu</p>
+                  <div className="space-y-3 bg-purple-50 p-3 rounded-lg border border-purple-200">
+                    <div>
+                      <p className="text-xs text-slate-600 mb-1">Leads Masuk:</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-700">Bulan Ini: <strong>{monthlyAnalytics.monthlyLeads}</strong></span>
+                        {monthlyAnalytics.lastMonthLeads > 0 && (
+                          <span className={`text-xs font-bold ${
+                            monthlyAnalytics.leadsGrowth > 0 ? "text-green-600" : 
+                            monthlyAnalytics.leadsGrowth < 0 ? "text-red-600" : "text-slate-600"
+                          }`}>
+                            {monthlyAnalytics.leadsGrowth > 0 ? "↑" : monthlyAnalytics.leadsGrowth < 0 ? "↓" : "→"}
+                            {" "}
+                            {Math.abs(monthlyAnalytics.leadsGrowth).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-500">Bulan Lalu: {monthlyAnalytics.lastMonthLeads}</span>
+                    </div>
+                    
+                    <div>
+                      <p className="text-xs text-slate-600 mb-1">Deals Closed:</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-700">Bulan Ini: <strong>{monthlyAnalytics.monthlyDeals}</strong></span>
+                        {monthlyAnalytics.lastMonthDeals > 0 && (
+                          <span className={`text-xs font-bold ${
+                            monthlyAnalytics.dealsGrowth > 0 ? "text-green-600" : 
+                            monthlyAnalytics.dealsGrowth < 0 ? "text-red-600" : "text-slate-600"
+                          }`}>
+                            {monthlyAnalytics.dealsGrowth > 0 ? "↑" : monthlyAnalytics.dealsGrowth < 0 ? "↓" : "→"}
+                            {" "}
+                            {Math.abs(monthlyAnalytics.dealsGrowth).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-500">Bulan Lalu: {monthlyAnalytics.lastMonthDeals}</span>
                     </div>
                   </div>
                 </div>
