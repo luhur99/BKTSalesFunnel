@@ -31,6 +31,7 @@ interface WeeklyAnalytics {
   stageDistribution: { stage: string; count: number; percentage: number }[];
   leadsPerDay: { day: string; count: number }[];
   dealsPerDay: { day: string; count: number }[];
+  tDayOfWeek: { day: string; count: number }[];
 }
 
 interface MonthlyAnalytics {
@@ -69,7 +70,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       // Load source breakdown and conversion
       await loadSourceBreakdown();
       await loadSourceConversion();
-      await loadWeeklyAnalytics();
+      await loadMonthlyLeadAnalytics();
       await loadMonthlyAnalytics();
     } catch (error) {
       console.error("Error loading analytics:", error);
@@ -183,7 +184,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     }
   };
 
-  const loadWeeklyAnalytics = async () => {
+  const loadMonthlyLeadAnalytics = async () => {
     try {
       const leads = await db.leads.getAll();
       
@@ -643,7 +644,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                 <Award className="w-4 h-4 text-green-600" />
               </div>
-              Analisa Bulanan
+              Analisa Lead Bulanan
             </CardTitle>
             <CardDescription className="text-xs">Data lead bulan ini</CardDescription>
           </CardHeader>
