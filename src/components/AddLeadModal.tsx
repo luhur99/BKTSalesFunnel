@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/supabase";
 import { LeadSource, Stage } from "@/types/lead";
-import { Loader2, X, Tag, Plus } from "lucide-react";
+import { Loader2, X, Tag, Plus, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -23,6 +24,9 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
+  const [funnel, setFunnel] = useState<"follow_up" | "broadcast">("follow_up");
+  const [error, setError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -32,40 +36,21 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
     current_stage_id: "",
     status: "active",
     custom_labels: [] as string[],
-    notes: ""
+    notes: "",
+    deal_value: "" as string | number
   });
 
   useEffect(() => {
     if (isOpen) {
       loadData();
+      setError(null);
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && editLead) {
-      console.log("🔵 EDIT MODE: Prepopulating form with lead data:", editLead);
-      console.log("🔑 CRITICAL ID VERIFICATION:");
-      console.log("  - Lead ID from prop:", editLead.id);
-      console.log("  - Lead Name:", editLead.name);
-      console.log("  - Source ID from lead:", editLead.source_id);
-      console.log("  - Stage ID from lead:", editLead.current_stage_id);
-      console.log("  - Available sources count:", sources.length);
-      console.log("  - Available stages count:", stages.length);
-      
-      // CRITICAL: Only prepopulate if sources and stages are loaded
-      if (sources.length === 0 || stages.length === 0) {
-        console.log("⏳ Waiting for sources and stages to load before prepopulation...");
-        return;
-      }
-      
-      // Verify IDs exist in loaded data
-      const sourceExists = sources.find(s => s.id === editLead.source_id);
-      const stageExists = stages.find(s => s.id === editLead.current_stage_id);
-      
-      console.log("  - Source found in dropdown?", sourceExists ? `YES (${sourceExists.name})` : "❌ NO!");
-      console.log("  - Stage found in dropdown?", stageExists ? `YES (${stageExists.stage_name})` : "❌ NO!");
-      
-      const prepopulatedData = {
+      // Prepopulate form for editing
+      setFormData({
         name: editLead.name || "",
         email: editLead.email || "",
         phone: editLead.phone || "",
@@ -74,68 +59,71 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         current_stage_id: editLead.current_stage_id || "",
         status: editLead.status || "active",
         custom_labels: Array.isArray(editLead.custom_labels) ? editLead.custom_labels : [],
-        notes: editLead.last_response_note || ""
-      };
+        notes: editLead.last_response_note || "",
+        deal_value: editLead.deal_value || ""
+      });
       
-      console.log("📝 Prepopulated form data:", prepopulatedData);
-      console.log("🔍 Checking fields:");
-      console.log("  - Name:", editLead.name, "→", prepopulatedData.name);
-      console.log("  - Phone:", editLead.phone, "→", prepopulatedData.phone);
-      console.log("  - Email:", editLead.email, "→", prepopulatedData.email);
-      console.log("  - Company:", editLead.company, "→", prepopulatedData.company);
-      console.log("  - Source ID:", editLead.source_id, "→", prepopulatedData.source_id);
-      console.log("  - Stage ID:", editLead.current_stage_id, "→", prepopulatedData.current_stage_id);
-      console.log("  - Status:", editLead.status, "→", prepopulatedData.status);
-      console.log("  - Custom Labels:", editLead.custom_labels, "→", prepopulatedData.custom_labels);
-      console.log("  - Notes:", editLead.last_response_note, "→", prepopulatedData.notes);
-      
-      setFormData(prepopulatedData);
-      
-      console.log("✅ Form data set complete");
+      // Determine funnel based on stage
+      if (editLead.current_stage_id && stages.length > 0) {
+        const stage = stages.find(s => s.id === editLead.current_stage_id);
+        if (stage) {
+          setFunnel(stage.funnel_type as "follow_up" | "broadcast");
+        }
+      }
     } else if (isOpen && !editLead) {
-      console.log("🆕 CREATE MODE: Resetting form to default values");
+      // Reset form for new lead
       setFormData({
         name: "",
         email: "",
         phone: "",
         company: "",
-        source_id: sources.length > 0 ? sources[0].id : "",
-        current_stage_id: stages.length > 0 ? stages[0].id : "",
+        source_id: "",
+        current_stage_id: "",
         status: "active",
         custom_labels: [],
-        notes: ""
+        notes: "",
+        deal_value: ""
       });
+      setFunnel("follow_up");
     }
-  }, [isOpen, editLead, stages, sources]);
+  }, [isOpen, editLead, stages]);
 
   const loadData = async () => {
     try {
-      console.log("📊 Loading sources and stages...");
-      
-      // Load sources from database
+      // Load sources
       const sourcesData = await db.sources.getAll();
       setSources(sourcesData);
-      console.log("✅ Sources loaded:", sourcesData.length);
       
-      // Load ALL stages (both follow-up and broadcast) for editing
+      // Set default source if creating new lead
+      if (!editLead && sourcesData.length > 0) {
+        setFormData(prev => ({ ...prev, source_id: sourcesData[0].id }));
+      }
+      
+      // Load stages
       const followUpStages = await db.stages.getByFunnel("follow_up");
       const broadcastStages = await db.stages.getByFunnel("broadcast");
       const allStages = [...followUpStages, ...broadcastStages].sort((a, b) => {
-        // Sort by funnel first, then by stage_number
         if (a.funnel_type !== b.funnel_type) {
           return a.funnel_type === "follow_up" ? -1 : 1;
         }
         return a.stage_number - b.stage_number;
       });
       setStages(allStages);
-      console.log("✅ Stages loaded:", allStages.length, "(Follow-up:", followUpStages.length, "+ Broadcast:", broadcastStages.length, ")");
       
-      // Load available labels from database (Settings → Custom Labels)
+      // Set default stage if creating new lead
+      if (!editLead && followUpStages.length > 0) {
+        const firstStage = followUpStages.find(s => s.stage_number === 1);
+        if (firstStage) {
+          setFormData(prev => ({ ...prev, current_stage_id: firstStage.id }));
+        }
+      }
+      
+      // Load available labels
       const customLabels = await db.customLabels.getAll();
       setAvailableLabels(customLabels.map((l: any) => l.name));
-      console.log("✅ Custom labels loaded from database:", customLabels.length);
     } catch (error) {
-      console.error("❌ Error loading data:", error);
+      console.error("Error loading data:", error);
+      setError("Gagal memuat data options. Silakan refresh halaman.");
     }
   };
 
@@ -170,110 +158,94 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
     });
   };
 
+  // Update stage when funnel changes
+  const handleFunnelChange = (newFunnel: "follow_up" | "broadcast") => {
+    setFunnel(newFunnel);
+    
+    // Find first stage of new funnel
+    const firstStage = stages.find(s => s.funnel_type === newFunnel && s.stage_number === 1);
+    if (firstStage) {
+      setFormData(prev => ({ ...prev, current_stage_id: firstStage.id }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
-      const selectedStage = stages.find(s => s.id === formData.current_stage_id);
-      
-      const leadData = {
-        name: formData.name || null,
-        email: formData.email || null,
-        phone: formData.phone,
-        company: formData.company || null,
+      // 1. Validation
+      if (!formData.name || formData.name.trim() === "") {
+        throw new Error("Nama Lead wajib diisi!");
+      }
+
+      if (!formData.source_id) {
+        // Try to set default source if missing
+        if (sources.length > 0) {
+          formData.source_id = sources[0].id;
+        } else {
+          throw new Error("Lead Source wajib dipilih!");
+        }
+      }
+
+      // Ensure stage is set
+      let stageId = formData.current_stage_id;
+      if (!stageId) {
+        const defaultStage = stages.find(s => s.funnel_type === funnel && s.stage_number === 1);
+        if (defaultStage) {
+          stageId = defaultStage.id;
+        } else {
+          throw new Error("Stage tidak valid. Hubungi admin untuk konfigurasi stage.");
+        }
+      }
+
+      // 2. Prepare Payload
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email?.trim() || null,
+        phone: formData.phone?.trim() || null,
+        company: formData.company?.trim() || null,
         source_id: formData.source_id,
-        current_stage_id: formData.current_stage_id,
-        current_funnel: selectedStage?.funnel_type || "follow_up",
-        status: formData.status,
+        current_stage_id: stageId,
+        status: formData.status as any,
         custom_labels: formData.custom_labels,
-        last_response_note: formData.notes || null,
-        updated_at: new Date().toISOString()
+        last_response_note: formData.notes?.trim() || null, // Map notes to last_response_note
+        deal_value: formData.deal_value ? Number(formData.deal_value) : null
       };
 
-      console.log("📤 Attempting to save lead:", leadData);
-      console.log("🌐 Current URL:", window.location.href);
-      console.log("🔧 User Agent:", navigator.userAgent);
+      console.log("🚀 Submitting payload:", payload);
 
+      // 3. Execute
       if (editLead) {
-        console.log("🔄 UPDATE MODE:");
-        console.log("  - Target Lead ID:", editLead.id);
-        console.log("  - Lead Name:", editLead.name);
-        console.log("  - Updated Data:", leadData);
-        
-        const result = await db.leads.update(editLead.id, leadData);
-        console.log("✅ Lead updated successfully:", result);
+        await db.leads.update(editLead.id, payload);
       } else {
-        console.log("➕ CREATE MODE:");
-        console.log("  - New Lead Data:", leadData);
-        
-        const result = await db.leads.create({
-          ...leadData,
-          created_at: new Date().toISOString()
-        });
-        console.log("✅ Lead created successfully:", result);
+        await db.leads.create(payload);
       }
-      
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        company: "",
-        source_id: "",
-        current_stage_id: stages[0]?.id || "",
-        status: "active",
-        custom_labels: [],
-        notes: ""
-      });
-      
+
+      console.log("✅ Success!");
       onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error("❌ Error saving lead:", error);
-      console.error("Error stack:", error?.stack);
-      console.error("Error details:", {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code,
-        hint: error?.hint,
-        details: error?.details
-      });
+
+    } catch (err: any) {
+      console.error("❌ Submit error:", err);
+      let errorMessage = err.message || "Terjadi kesalahan saat menyimpan lead.";
       
-      // Network error detection
-      if (error?.message?.includes("fetch") || error?.message?.includes("network")) {
-        alert(`❌ Network Error!\n\nCannot connect to database. Please check:\n\n1. Internet connection\n2. Firewall/proxy settings\n3. VPN if applicable\n\nTechnical details:\n${error.message}`);
-        return;
+      // User friendly error mapping
+      if (err.code === "23502") {
+        errorMessage = "Data tidak lengkap: Nama lead wajib diisi.";
+      } else if (err.message?.includes("fetch")) {
+        errorMessage = "Gagal terhubung ke server. Periksa koneksi internet Anda.";
       }
-      
-      // CORS error detection
-      if (error?.message?.includes("CORS") || error?.code === "PGRST301") {
-        alert(`❌ CORS Error!\n\nCannot access database from this domain.\n\nPlease contact administrator to whitelist:\n${window.location.origin}\n\nTechnical details:\n${error.message}`);
-        return;
-      }
-      
-      // Authentication error detection
-      if (error?.code === "PGRST301" || error?.message?.includes("JWT")) {
-        alert(`❌ Authentication Error!\n\nInvalid API key or expired session.\n\nPlease contact administrator.\n\nTechnical details:\n${error.message}`);
-        return;
-      }
-      
-      // Generic error with full details
-      const errorMessage = error?.message || "Unknown error";
-      const errorHint = error?.hint ? `\n\nHint: ${error.hint}` : "";
-      const errorDetails = error?.details ? `\n\nDetails: ${error.details}` : "";
-      const errorCode = error?.code ? `\n\nError Code: ${error.code}` : "";
-      
-      alert(`❌ Gagal menyimpan lead!\n\n${errorMessage}${errorHint}${errorDetails}${errorCode}\n\n⚠️ DEBUGGING INFO:\n- Check browser console (F12) for full error details\n- Screenshot this message and send to admin`);
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const isFormValid = () => {
-    const hasPhone = formData.phone.trim() !== "";
-    const hasSource = formData.source_id;
-    const hasStage = formData.current_stage_id;
-    return hasPhone && hasSource && hasStage;
+    return formData.name.trim() !== "" && formData.source_id !== "";
   };
 
   return (
@@ -284,224 +256,241 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
             {editLead ? "Edit Lead" : "Tambah Lead Baru"}
           </DialogTitle>
           <DialogDescription>
-            {editLead ? "Update informasi lead" : "Tambahkan lead baru ke sistem. Wajib mengisi No. Phone/WhatsApp."}
+            {editLead ? "Update informasi lead" : "Tambahkan lead baru ke sistem."}
           </DialogDescription>
         </DialogHeader>
 
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Informasi Lead</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama (Opsional)</Label>
-                <Input
-                  id="name"
-                  placeholder="Nama lengkap..."
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="company">Company (Opsional)</Label>
-                <Input
-                  id="company"
-                  placeholder="Nama perusahaan..."
-                  value={formData.company}
-                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">
-                  No. Phone/WhatsApp <span className="text-red-500">*</span>
+            {/* --- SECTION 1: ESSENTIAL INFO --- */}
+            <div className="bg-slate-50 p-4 rounded-lg border space-y-4">
+              <h3 className="font-semibold text-sm text-slate-500 uppercase tracking-wider">Informasi Utama</h3>
+              
+              <div>
+                <Label htmlFor="name" className="text-sm font-medium">
+                  Nama Lead <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="phone"
-                  placeholder="08123456789"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Contoh: Budi Santoso"
+                  className="mt-1 bg-white"
                   required
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email (Opsional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="text-sm text-slate-500 italic">
-              * Wajib mengisi No. Phone/WhatsApp
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Source, Stage & Status</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>
-                  Lead Source <span className="text-red-500">*</span>
-                </Label>
-                <Select value={formData.source_id} onValueChange={(v) => setFormData({ ...formData, source_id: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih source..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sources.map((source) => (
-                      <SelectItem key={source.id} value={source.id}>
-                        {source.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>
-                  Initial Stage <span className="text-red-500">*</span>
-                </Label>
-                <Select value={formData.current_stage_id} onValueChange={(v) => setFormData({ ...formData, current_stage_id: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih stage..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {stages.map((stage) => (
-                      <SelectItem key={stage.id} value={stage.id}>
-                        [{stage.funnel_type === "follow_up" ? "F" : "B"}] {stage.stage_number}. {stage.stage_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>
-                  Status <span className="text-red-500">*</span>
-                </Label>
-                <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Aktif</SelectItem>
-                    <SelectItem value="deal">Deal</SelectItem>
-                    <SelectItem value="lost">Lost</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <Tag className="w-5 h-5" />
-              Custom Labels
-            </h3>
-            
-            {availableLabels.length > 0 && (
-              <div className="space-y-2">
-                <Label>Pilih dari Label yang Tersedia (dari Settings)</Label>
-                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border">
-                  {availableLabels.map((label, idx) => {
-                    const isSelected = formData.custom_labels.includes(label);
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleToggleLabel(label)}
-                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                          isSelected 
-                            ? "bg-blue-600 text-white shadow-md" 
-                            : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                        }`}
-                      >
-                        <Tag className="w-3 h-3 inline mr-1" />
-                        {label}
-                      </button>
-                    );
-                  })}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="phone">No. Phone / WhatsApp</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="Contoh: 08123456789"
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="email@example.com"
+                    className="mt-1 bg-white"
+                  />
                 </div>
               </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="label-input">Atau Tambah Label Baru</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="label-input"
-                  placeholder="Contoh: VIP, Hot Lead, Follow Up Urgent..."
-                  value={labelInput}
-                  onChange={(e) => setLabelInput(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddLabel();
-                    }
-                  }}
-                />
-                <Button type="button" onClick={handleAddLabel} variant="outline" className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Tambah
-                </Button>
-              </div>
+            </div>
+
+            {/* --- SECTION 2: PIPELINE INFO --- */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-slate-500 uppercase tracking-wider">Pipeline & Source</h3>
               
-              {formData.custom_labels.length > 0 && (
-                <div className="space-y-2 mt-3">
-                  <Label className="text-sm">Label Terpilih:</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.custom_labels.map((label, idx) => (
-                      <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1.5 gap-1">
-                        <Tag className="w-3 h-3" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="source">Source <span className="text-red-500">*</span></Label>
+                  <Select 
+                    value={formData.source_id} 
+                    onValueChange={(val) => setFormData({ ...formData, source_id: val })}
+                  >
+                    <SelectTrigger className="mt-1 bg-white">
+                      <SelectValue placeholder="Pilih Source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sources.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="funnel">Funnel Type</Label>
+                  <Select 
+                    value={funnel} 
+                    onValueChange={(val: "follow_up" | "broadcast") => handleFunnelChange(val)}
+                  >
+                    <SelectTrigger className="mt-1 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="follow_up">Follow Up</SelectItem>
+                      <SelectItem value="broadcast">Broadcast</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="stage">Current Stage</Label>
+                  <Select 
+                    value={formData.current_stage_id} 
+                    onValueChange={(val) => setFormData({ ...formData, current_stage_id: val })}
+                  >
+                    <SelectTrigger className="mt-1 bg-white">
+                      <SelectValue placeholder="Pilih Stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stages
+                        .filter(s => s.funnel_type === funnel)
+                        .map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.stage_number}. {s.stage_name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select 
+                    value={formData.status} 
+                    onValueChange={(val) => setFormData({ ...formData, status: val })}
+                  >
+                    <SelectTrigger className="mt-1 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="deal">Deal</SelectItem>
+                      <SelectItem value="lost">Lost</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* --- SECTION 3: ADDITIONAL INFO --- */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-slate-500 uppercase tracking-wider">Additional Info</h3>
+              
+              <div>
+                <Label htmlFor="company">Company / Instansi</Label>
+                <Input
+                  id="company"
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  placeholder="Nama perusahaan"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="deal_value">Deal Value (Rp)</Label>
+                <Input
+                  id="deal_value"
+                  type="number"
+                  value={formData.deal_value}
+                  onChange={(e) => setFormData({ ...formData, deal_value: e.target.value })}
+                  placeholder="0"
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="mb-2 block">Custom Labels</Label>
+                
+                {/* Available Labels Quick Select */}
+                {availableLabels.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 rounded border">
+                    {availableLabels.map((label) => (
+                      <Badge
+                        key={label}
+                        variant={formData.custom_labels.includes(label) ? "default" : "outline"}
+                        className="cursor-pointer hover:bg-primary/90"
+                        onClick={() => handleToggleLabel(label)}
+                      >
                         {label}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLabel(label)}
-                          className="ml-2 hover:bg-slate-300 rounded-full p-0.5 transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
                       </Badge>
                     ))}
                   </div>
+                )}
+
+                {/* Add New Label */}
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    value={labelInput}
+                    onChange={(e) => setLabelInput(e.target.value)}
+                    placeholder="Tambah label baru..."
+                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddLabel())}
+                  />
+                  <Button type="button" onClick={handleAddLabel} variant="secondary">
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
-              )}
+
+                {/* Selected Labels Display */}
+                <div className="flex flex-wrap gap-2">
+                  {formData.custom_labels.map((label) => (
+                    <Badge key={label} variant="secondary" className="gap-1 pl-2">
+                      <Tag className="h-3 w-3" />
+                      {label}
+                      <button 
+                        type="button" 
+                        onClick={() => handleRemoveLabel(label)}
+                        className="hover:text-red-500 ml-1"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="notes">Catatan</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Catatan tambahan tentang lead ini..."
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Catatan</h3>
-            
-            <div className="space-y-2">
-              <Label htmlFor="notes">Catatan Awal (Opsional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Catatan atau informasi tambahan tentang lead ini..."
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t">
+          <div className="flex gap-3 pt-4 border-t sticky bottom-0 bg-white">
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Batal
             </Button>
             <Button 
               type="submit" 
-              disabled={!isFormValid() || loading}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              disabled={loading || !isFormValid()}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
             >
               {loading ? (
                 <>
@@ -509,7 +498,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                   Menyimpan...
                 </>
               ) : (
-                editLead ? "Update Lead" : "Tambah Lead"
+                editLead ? "Simpan Perubahan" : "Tambah Lead"
               )}
             </Button>
           </div>
