@@ -449,6 +449,9 @@ export const db = {
         console.log("🔵 SUPABASE - moveToStage started");
         console.log("📊 Lead ID:", leadId);
         console.log("📊 Target Stage ID:", toStageId);
+        console.log("📊 Reason:", reason);
+        console.log("📊 Notes:", notes);
+        console.log("📊 User ID:", userId);
         
         // Get current lead info
         const { data: lead, error: leadError } = await supabase
@@ -478,35 +481,47 @@ export const db = {
         
         console.log("✅ Target stage info:", toStage);
 
-        // Create history record
-        console.log("📝 Creating history record...");
-        const { error: historyError } = await supabase.from("lead_stage_history").insert([{
+        // Create history record with proper timestamp
+        const movedAt = new Date().toISOString();
+        console.log("📝 Creating history record with timestamp:", movedAt);
+        
+        const historyPayload = {
           lead_id: leadId,
           from_stage_id: lead.current_stage_id,
           to_stage_id: toStageId,
           from_funnel: lead.current_funnel,
           to_funnel: toStage.funnel_type,
-          reason,
-          notes,
+          reason: reason,
+          notes: notes,
           moved_by: userId,
-          moved_at: new Date().toISOString()
-        }]);
+          moved_at: movedAt
+        };
+        
+        console.log("📊 History payload:", historyPayload);
+        
+        const { data: historyData, error: historyError } = await supabase
+          .from("lead_stage_history")
+          .insert([historyPayload])
+          .select();
         
         if (historyError) {
           console.error("❌ Error creating history:", historyError);
+          console.error("❌ History error code:", historyError.code);
+          console.error("❌ History error details:", historyError.details);
+          console.error("❌ History error hint:", historyError.hint);
           throw historyError;
         }
         
-        console.log("✅ History record created");
+        console.log("✅ History record created:", historyData);
 
-        // Update lead
+        // Update lead with new stage
         console.log("📝 Updating lead...");
         const { error: updateError } = await supabase
           .from("leads")
           .update({
             current_stage_id: toStageId,
             current_funnel: toStage.funnel_type,
-            updated_at: new Date().toISOString()
+            updated_at: movedAt
           })
           .eq("id", leadId);
         
@@ -518,7 +533,6 @@ export const db = {
         console.log("✅ Lead updated successfully");
         console.log("🎉 MOVE STAGE COMPLETED!");
 
-        // Check if moved to stage 10 broadcast -> auto LOST (handled by trigger)
       } catch (error) {
         console.error("❌ moveToStage - Fatal error:", error);
         throw error;
