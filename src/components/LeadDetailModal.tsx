@@ -78,8 +78,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       
       setMoveToStage("");
       setMoveNotes("");
-      onUpdate();
-      loadLeadData();
+      onUpdate(); // Refresh parent (dashboard/kanban)
+      onClose(); // Close modal to force refresh with new data
     } catch (error) {
       console.error("❌ MOVE STAGE - Error:", error);
       alert(`Gagal memindahkan lead: ${error.message}`);
@@ -133,7 +133,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       onUpdate();
-      loadLeadData();
+      onClose(); // Close modal to force refresh
     } catch (error) {
       console.error("Error moving to broadcast:", error);
     } finally {
@@ -157,7 +157,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       onUpdate();
-      loadLeadData();
+      onClose(); // Close modal to force refresh
     } catch (error) {
       console.error("Error moving to follow up:", error);
     } finally {
