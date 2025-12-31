@@ -276,7 +276,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
               
               <div>
                 <Label htmlFor="name" className="text-sm font-medium">
-                  Nama Lead <span className="text-red-500">*</span>
+                  Nama <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="name"
@@ -290,7 +290,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="phone">No. Phone / WhatsApp</Label>
+                  <Label htmlFor="phone">No. Phone / WhatsApp <span className="text-red-500">*</span></Label>
                   <Input
                     id="phone"
                     type="tel"
@@ -298,6 +298,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="Contoh: 08123456789"
                     className="mt-1 bg-white"
+                    required
                   />
                 </div>
                 <div>
