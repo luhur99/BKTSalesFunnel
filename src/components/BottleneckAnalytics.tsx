@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Clock, Users, Facebook, Globe, Share2, UserPlus } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook, Globe, Share2, UserPlus, Target } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
 
@@ -20,6 +20,8 @@ interface SourceBreakdown {
 
 interface SourceConversion {
   source: string;
+  totalLeads: number;
+  dealLeads: number;
   conversionRate: number;
 }
 
@@ -39,8 +41,9 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       const data = await db.analytics.getBottleneckAnalytics();
       setAnalytics(data);
       
-      // Load source breakdown
+      // Load source breakdown and conversion
       await loadSourceBreakdown();
+      await loadSourceConversion();
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
@@ -52,14 +55,20 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     try {
       const leads = await db.leads.getAll();
       
-      // ✅ FIX: Convert null/undefined to "Unknown" and ensure it's a string
+      // Debug logging
+      console.log("🔍 DEBUG: Total leads fetched:", leads.length);
+      if (leads.length > 0) {
+        console.log("🔍 DEBUG: Sample lead structure:", leads[0]);
+        console.log("🔍 DEBUG: Lead[0] source object:", leads[0].source);
+        console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
+      }
+      
       const sourceMap = new Map<string, number>();
       leads.forEach(lead => {
         const sourceName = lead.source?.name || "Unknown";
         sourceMap.set(sourceName, (sourceMap.get(sourceName) || 0) + 1);
       });
       
-      // Calculate percentages
       const total = leads.length;
       const breakdown: SourceBreakdown[] = Array.from(sourceMap.entries()).map(([source, count]) => ({
         source,
@@ -67,7 +76,6 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
         percentage: total > 0 ? (count / total) * 100 : 0
       }));
       
-      // Sort by count descending
       breakdown.sort((a, b) => b.count - a.count);
       
       setSourceBreakdown(breakdown);
@@ -80,32 +88,36 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     try {
       const leads = await db.leads.getAll();
       
-      // ✅ FIX: Convert null/undefined to "Unknown" and ensure it's a string
-      const sourceMap = new Map<string, number>();
+      const sourceMap = new Map<string, { total: number; deals: number }>();
       leads.forEach(lead => {
         const sourceName = lead.source?.name || "Unknown";
-        sourceMap.set(sourceName, (sourceMap.get(sourceName) || 0) + 1);
+        const isDeal = lead.status === "Deal";
+        
+        if (!sourceMap.has(sourceName)) {
+          sourceMap.set(sourceName, { total: 0, deals: 0 });
+        }
+        
+        const current = sourceMap.get(sourceName)!;
+        current.total += 1;
+        if (isDeal) current.deals += 1;
       });
       
-      // Calculate percentages
-      const total = leads.length;
-      const breakdown: SourceBreakdown[] = Array.from(sourceMap.entries()).map(([source, count]) => ({
+      const conversions: SourceConversion[] = Array.from(sourceMap.entries()).map(([source, data]) => ({
         source,
-        count,
-        percentage: total > 0 ? (count / total) * 100 : 0
+        totalLeads: data.total,
+        dealLeads: data.deals,
+        conversionRate: data.total > 0 ? (data.deals / data.total) * 100 : 0
       }));
       
-      // Sort by count descending
-      breakdown.sort((a, b) => b.count - a.count);
+      conversions.sort((a, b) => b.conversionRate - a.conversionRate);
       
-      setSourceBreakdown(breakdown);
+      setSourceConversion(conversions);
     } catch (error) {
-      console.error("Error loading source breakdown:", error);
+      console.error("Error loading source conversion:", error);
     }
   };
 
   const getSourceIcon = (source: string | null | undefined) => {
-    // ✅ FIX: Handle null/undefined source
     if (!source || typeof source !== "string") return UserPlus;
     
     const lowerSource = source.toLowerCase();
@@ -128,13 +140,12 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
   };
 
   const getConversionColor = (rate: number) => {
-    if (rate >= 70) return "text-green-600";
-    if (rate >= 50) return "text-yellow-600";
-    return "text-red-600";
+    if (rate >= 30) return "bg-green-500";
+    if (rate >= 20) return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   const getConversionBadge = (rate: number) => {
-    // Cap at 100% for display (data quality issue if > 100%)
     const displayRate = Math.min(rate, 100);
     if (displayRate >= 70) return { color: "bg-green-100 text-green-700 border-green-200", icon: TrendingUp };
     if (displayRate >= 50) return { color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: TrendingUp };
@@ -155,7 +166,6 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
   };
 
   const getOverallStats = async () => {
-    // Get stats directly from database - more reliable than summing analytics
     const stats = await db.leads.getStats();
     
     return { 
@@ -240,20 +250,54 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-white">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Leads Progressing</p>
-                <p className="text-3xl font-bold text-green-600">{stats.totalProgressing}</p>
+        {/* NEW: Conversion Rate by Source Card */}
+        <Card className="border-slate-200 bg-white md:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Target className="w-4 h-4 text-purple-600" />
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
+              Conversion Rate by Source
+            </CardTitle>
+            <CardDescription className="text-xs">Persentase konversi menjadi Deal</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {sourceConversion.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">Belum ada data konversi</p>
+            ) : (
+              sourceConversion.map((item, index) => {
+                const Icon = getSourceIcon(item.source);
+                return (
+                  <div key={item.source} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-4 h-4 text-slate-600" />
+                        <span className="font-medium text-slate-700">{item.source}</span>
+                      </div>
+                      <span className="text-xs text-slate-500">
+                        {item.totalLeads} leads → {item.dealLeads} deals
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 mb-1">
+                        Conversion: {item.conversionRate.toFixed(1)}%
+                      </p>
+                      <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`absolute top-0 left-0 h-full ${getConversionColor(item.conversionRate)} transition-all duration-500`}
+                          style={{ width: `${Math.min(item.conversionRate, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </CardContent>
         </Card>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-slate-200 bg-white">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -267,9 +311,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-slate-200 bg-white">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -325,7 +367,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
               {bottlenecks.map((stage) => {
                 const badge = getConversionBadge(stage.conversion_rate);
                 const Icon = badge.icon;
-                const displayRate = Math.min(stage.conversion_rate, 100); // Cap at 100%
+                const displayRate = Math.min(stage.conversion_rate, 100);
                 const hasAnomaly = stage.conversion_rate > 100;
                 
                 return (
