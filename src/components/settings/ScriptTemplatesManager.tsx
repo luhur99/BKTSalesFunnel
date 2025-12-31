@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -218,6 +219,9 @@ export function ScriptTemplatesManager() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingScript ? "Edit Script Template" : "Tambah Script Template"}</DialogTitle>
+            <DialogDescription>
+              {editingScript ? "Edit script template yang ada." : "Buat script template baru."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

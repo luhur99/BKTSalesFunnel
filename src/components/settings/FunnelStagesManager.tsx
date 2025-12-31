@@ -10,7 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -188,6 +188,9 @@ export function FunnelStagesManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Tambah Stage Baru</DialogTitle>
+            <DialogDescription>
+              Buat stage baru untuk funnel yang dipilih
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -233,6 +236,9 @@ export function FunnelStagesManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Stage</DialogTitle>
+            <DialogDescription>
+              Update informasi stage yang sudah ada
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

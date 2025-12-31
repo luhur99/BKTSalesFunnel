@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -245,6 +246,11 @@ export function CustomLabelsManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingLabel ? "Edit Label" : "Tambah Label Baru"}</DialogTitle>
+            <DialogDescription>
+              {editingLabel
+                ? "Ubah informasi label yang ada."
+                : "Buat label baru untuk mengelompokkan data dengan lebih baik."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

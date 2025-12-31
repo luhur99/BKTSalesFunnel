@@ -78,7 +78,13 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       
       setMoveToStage("");
       setMoveNotes("");
+      
+      // CRITICAL FIX: Call onUpdate first and wait a bit for refresh
       onUpdate(); // Refresh parent (dashboard/kanban)
+      
+      // Wait 100ms for state updates to propagate before closing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       onClose(); // Close modal to force refresh with new data
     } catch (error) {
       console.error("❌ MOVE STAGE - Error:", error);
@@ -132,7 +138,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Lead tidak merespon, dipindah ke Broadcast Funnel",
         "Sales User"
       );
+      
       onUpdate();
+      
+      // Wait for state updates before closing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       onClose(); // Close modal to force refresh
     } catch (error) {
       console.error("Error moving to broadcast:", error);
@@ -156,7 +167,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Lead merespon, kembali ke Follow Up Funnel",
         "Sales User"
       );
+      
       onUpdate();
+      
+      // Wait for state updates before closing
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       onClose(); // Close modal to force refresh
     } catch (error) {
       console.error("Error moving to follow up:", error);
@@ -209,6 +225,9 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
               <DialogTitle className="text-2xl">
                 {lead.name || <span className="text-slate-400 italic">Lead Tanpa Nama</span>}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                Detail informasi dan riwayat lead, termasuk kontak, aktivitas, dan perpindahan stage
+              </DialogDescription>
               <div className="flex items-center gap-3 mt-2 text-sm text-slate-600 flex-wrap">
                 <Badge variant="secondary" className="gap-1 font-normal">
                   <Globe className="w-3 h-3" />

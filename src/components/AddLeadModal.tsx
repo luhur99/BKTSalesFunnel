@@ -252,11 +252,11 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">
-            {editLead ? "Edit Lead" : "Tambah Lead Baru"}
-          </DialogTitle>
+          <DialogTitle>{editLead ? "Edit Lead" : "Tambah Lead Baru"}</DialogTitle>
           <DialogDescription>
-            {editLead ? "Update informasi lead" : "Tambahkan lead baru ke sistem."}
+            {editLead 
+              ? "Update informasi lead yang sudah ada" 
+              : "Masukkan informasi lead baru ke dalam sistem"}
           </DialogDescription>
         </DialogHeader>
 

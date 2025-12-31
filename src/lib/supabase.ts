@@ -454,6 +454,7 @@ export const db = {
         console.log("📊 User ID:", userId);
         
         // Get current lead info
+        console.log("🔍 STEP 1: Fetching current lead info...");
         const { data: lead, error: leadError } = await supabase
           .from("leads")
           .select("current_stage_id, current_funnel")
@@ -468,6 +469,7 @@ export const db = {
         console.log("✅ Current lead info:", lead);
 
         // Get target stage info
+        console.log("🔍 STEP 2: Fetching target stage info...");
         const { data: toStage, error: stageError } = await supabase
           .from("stages")
           .select("funnel_type, stage_number")
@@ -483,7 +485,7 @@ export const db = {
 
         // Create history record with proper timestamp
         const movedAt = new Date().toISOString();
-        console.log("📝 Creating history record with timestamp:", movedAt);
+        console.log("🔍 STEP 3: Creating history record with timestamp:", movedAt);
         
         const historyPayload = {
           lead_id: leadId,
@@ -515,7 +517,7 @@ export const db = {
         console.log("✅ History record created:", historyData);
 
         // Update lead with new stage
-        console.log("📝 Updating lead...");
+        console.log("🔍 STEP 4: Updating lead...");
         const { error: updateError } = await supabase
           .from("leads")
           .update({
@@ -594,20 +596,20 @@ export const db = {
         return MOCK_SCRIPTS.find(s => s.stage_id === stageId) || null;
       }
       
-      // ✅ FIX: Remove .single() to handle 0 or multiple results
+      // ✅ FIX: Use maybeSingle() to handle 0 or 1 results properly (prevents 406 errors)
       const { data, error } = await supabase
         .from("stage_scripts")
         .select("*")
         .eq("stage_id", stageId)
-        .limit(1);  // Only get first result for performance
+        .maybeSingle();  // Changed from limit(1) to maybeSingle()
       
       if (error) {
         console.error("❌ Error fetching script for stage:", error);
         return null;
       }
       
-      // Return first item or null if array is empty
-      return data && data.length > 0 ? data[0] : null;
+      // maybeSingle() returns null if no row found, or the single row
+      return data;
     },
     create: async (scriptData: { stage_id: string; script_text: string; media_links?: string[]; image_url?: string | null; video_url?: string | null }) => {
       if (!isConnected) {

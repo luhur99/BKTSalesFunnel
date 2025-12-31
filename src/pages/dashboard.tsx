@@ -88,6 +88,7 @@ export default function Dashboard() {
   const handleLeadUpdate = () => {
     setRefreshTrigger(prev => prev + 1);
     loadMetrics();
+    loadBottlenecks();  // Also refresh bottleneck analytics
   };
 
   const handleCloseEditModal = () => {
