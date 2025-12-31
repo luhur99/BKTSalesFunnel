@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Clock, Users } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Clock, Users, Facebook, Globe, Share2, UserPlus } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
 
@@ -11,9 +11,16 @@ interface BottleneckAnalyticsProps {
   key?: string;
 }
 
+interface SourceBreakdown {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
 export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
   const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
 
   useEffect(() => {
     loadAnalytics();
@@ -24,11 +31,62 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
       setLoading(true);
       const data = await db.analytics.getBottleneckAnalytics();
       setAnalytics(data);
+      
+      // Load source breakdown
+      await loadSourceBreakdown();
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSourceBreakdown = async () => {
+    try {
+      const leads = await db.leads.getAll();
+      
+      // Group by source
+      const sourceMap = new Map<string, number>();
+      leads.forEach(lead => {
+        const source = lead.source || "Unknown";
+        sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+      });
+      
+      // Calculate percentages
+      const total = leads.length;
+      const breakdown: SourceBreakdown[] = Array.from(sourceMap.entries()).map(([source, count]) => ({
+        source,
+        count,
+        percentage: total > 0 ? (count / total) * 100 : 0
+      }));
+      
+      // Sort by count descending
+      breakdown.sort((a, b) => b.count - a.count);
+      
+      setSourceBreakdown(breakdown);
+    } catch (error) {
+      console.error("Error loading source breakdown:", error);
+    }
+  };
+
+  const getSourceIcon = (source: string) => {
+    const lowerSource = source.toLowerCase();
+    if (lowerSource.includes("facebook")) return Facebook;
+    if (lowerSource.includes("google")) return Globe;
+    if (lowerSource.includes("social")) return Share2;
+    return UserPlus;
+  };
+
+  const getSourceColor = (index: number) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-green-500",
+      "bg-purple-500",
+      "bg-orange-500",
+      "bg-pink-500",
+      "bg-indigo-500"
+    ];
+    return colors[index % colors.length];
   };
 
   const getConversionColor = (rate: number) => {
@@ -94,17 +152,53 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
     <div className="space-y-6">
       {/* Overall Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-slate-200 bg-white">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Total Leads Masuk</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.totalEntered}</p>
+        {/* Source Breakdown Card */}
+        <Card className="border-slate-200 bg-white md:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-4 h-4 text-blue-600" />
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
+              Lead Masuk by Source
+            </CardTitle>
+            <CardDescription className="text-xs">Breakdown traffic source</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {sourceBreakdown.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">Tidak ada data source</p>
+            ) : (
+              <>
+                {sourceBreakdown.map((item, index) => {
+                  const Icon = getSourceIcon(item.source);
+                  return (
+                    <div key={item.source} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-4 h-4 text-slate-600" />
+                          <span className="font-medium text-slate-700">{item.source}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-900 font-semibold">{item.count}</span>
+                          <span className="text-slate-500 text-xs">({item.percentage.toFixed(1)}%)</span>
+                        </div>
+                      </div>
+                      <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`absolute top-0 left-0 h-full ${getSourceColor(index)} transition-all duration-500`}
+                          style={{ width: `${item.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="pt-2 mt-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold text-slate-700">Total Leads:</span>
+                    <span className="font-bold text-slate-900">{sourceBreakdown.reduce((sum, s) => sum + s.count, 0)}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
