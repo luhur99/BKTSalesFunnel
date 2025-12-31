@@ -18,14 +18,20 @@ interface SourceBreakdown {
   percentage: number;
 }
 
-export function BottleneckAnalytics({ key, refreshTrigger }: BottleneckAnalyticsProps) {
+interface SourceConversion {
+  source: string;
+  conversionRate: number;
+}
+
+export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps) {
   const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
+  const [sourceConversion, setSourceConversion] = useState<SourceConversion[]>([]);
 
   useEffect(() => {
     loadAnalytics();
-  }, [key, refreshTrigger]);
+  }, [refreshTrigger]);
 
   const loadAnalytics = async () => {
     try {
@@ -43,6 +49,34 @@ export function BottleneckAnalytics({ key, refreshTrigger }: BottleneckAnalytics
   };
 
   const loadSourceBreakdown = async () => {
+    try {
+      const leads = await db.leads.getAll();
+      
+      // ✅ FIX: Convert null/undefined to "Unknown" and ensure it's a string
+      const sourceMap = new Map<string, number>();
+      leads.forEach(lead => {
+        const sourceName = lead.source?.name || "Unknown";
+        sourceMap.set(sourceName, (sourceMap.get(sourceName) || 0) + 1);
+      });
+      
+      // Calculate percentages
+      const total = leads.length;
+      const breakdown: SourceBreakdown[] = Array.from(sourceMap.entries()).map(([source, count]) => ({
+        source,
+        count,
+        percentage: total > 0 ? (count / total) * 100 : 0
+      }));
+      
+      // Sort by count descending
+      breakdown.sort((a, b) => b.count - a.count);
+      
+      setSourceBreakdown(breakdown);
+    } catch (error) {
+      console.error("Error loading source breakdown:", error);
+    }
+  };
+
+  const loadSourceConversion = async () => {
     try {
       const leads = await db.leads.getAll();
       
