@@ -89,20 +89,14 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         setFormData(prev => ({ ...prev, source_id: sourcesData[0].id }));
       }
       
-      // Load stages
+      // Load ONLY Follow Up stages
       const followUpStages = await db.stages.getByFunnel("follow_up");
-      const broadcastStages = await db.stages.getByFunnel("broadcast");
-      const allStages = [...followUpStages, ...broadcastStages].sort((a, b) => {
-        if (a.funnel_type !== b.funnel_type) {
-          return a.funnel_type === "follow_up" ? -1 : 1;
-        }
-        return a.stage_number - b.stage_number;
-      });
-      setStages(allStages);
+      const sortedStages = followUpStages.sort((a, b) => a.stage_number - b.stage_number);
+      setStages(sortedStages);
       
       // Set default stage if creating new lead
-      if (!editLead && followUpStages.length > 0) {
-        const firstStage = followUpStages.find(s => s.stage_number === 1);
+      if (!editLead && sortedStages.length > 0) {
+        const firstStage = sortedStages.find(s => s.stage_number === 1);
         if (firstStage) {
           setFormData(prev => ({ ...prev, current_stage_id: firstStage.id }));
         }
@@ -171,7 +165,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       // Ensure stage is set
       let stageId = formData.current_stage_id;
       if (!stageId) {
-        const defaultStage = stages.find(s => s.funnel_type === "follow_up" && s.stage_number === 1);
+        const defaultStage = stages.find(s => s.stage_number === 1);
         if (defaultStage) {
           stageId = defaultStage.id;
         } else {
