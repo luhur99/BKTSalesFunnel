@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook, Globe, Share2, UserPlus, Target, Calendar } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook, Globe, Share2, UserPlus, Target, Calendar, BarChart3, Award } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
 
@@ -33,12 +33,21 @@ interface WeeklyAnalytics {
   dealsPerDay: { day: string; count: number }[];
 }
 
+interface MonthlyAnalytics {
+  weeklyDeals: { week: number; count: number }[];
+  weeklyLeads: { week: number; count: number }[];
+  monthlyDeals: number;
+  monthlyLeads: number;
+  month: string;
+}
+
 export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps) {
   const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
   const [sourceConversion, setSourceConversion] = useState<SourceConversion[]>([]);
   const [weeklyAnalytics, setWeeklyAnalytics] = useState<WeeklyAnalytics | null>(null);
+  const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlyAnalytics | null>(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -54,6 +63,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       await loadSourceBreakdown();
       await loadSourceConversion();
       await loadWeeklyAnalytics();
+      await loadMonthlyAnalytics();
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
@@ -260,6 +270,51 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       });
     } catch (error) {
       console.error("Error loading weekly analytics:", error);
+    }
+  };
+
+  const loadMonthlyAnalytics = async () => {
+    try {
+      const leads = await db.leads.getAll();
+      
+      // Debug logging
+      console.log("🔍 DEBUG: Total leads fetched:", leads.length);
+      if (leads.length > 0) {
+        console.log("🔍 DEBUG: Sample lead structure:", leads[0]);
+        console.log("🔍 DEBUG: Lead[0] source object:", leads[0].source);
+        console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
+      }
+      
+      // 🔍 DEBUG: Log all lead statuses to check format
+      console.log("🔍 DEBUG: All lead statuses:", leads.map(l => ({ 
+        id: l.id, 
+        name: l.name, 
+        status: l.status,
+        statusType: typeof l.status,
+        statusTrimmed: l.status?.trim(),
+        statusLower: l.status?.toLowerCase()
+      })));
+      
+      // 🔧 FIX: Case-insensitive status check with trim
+      const dealLeads = leads.filter(l => l.status?.trim().toLowerCase() === "deal");
+      
+      // 🔍 DEBUG: Log final sourceMap
+      console.log("🔍 DEBUG: Deal leads count:", dealLeads.length);
+      
+      const totalLeads = leads.length;
+      const totalDeals = dealLeads.length;
+      
+      const month = new Date().toLocaleString("id-ID", { month: "long" });
+      
+      setMonthlyAnalytics({
+        weeklyDeals: [],
+        weeklyLeads: [],
+        monthlyDeals: totalDeals,
+        monthlyLeads: totalLeads,
+        month
+      });
+    } catch (error) {
+      console.error("Error loading monthly analytics:", error);
     }
   };
 
@@ -518,16 +573,55 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
         </Card>
 
         <Card className="border-slate-200 bg-white">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Lost Leads</p>
-                <p className="text-3xl font-bold text-slate-900">{stats.lostLeadsCount}</p>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <Award className="w-4 h-4 text-green-600" />
               </div>
-              <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                <TrendingDown className="w-6 h-6 text-slate-600" />
-              </div>
-            </div>
+              Analisa Bulanan
+            </CardTitle>
+            <CardDescription className="text-xs">Data lead bulan ini</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!monthlyAnalytics ? (
+              <p className="text-sm text-slate-500 text-center py-4">Loading...</p>
+            ) : (
+              <>
+                {/* Month */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-600">📅 Bulan</p>
+                    <span className="text-xs text-slate-500">{monthlyAnalytics.month}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div>
+                      <p className="text-lg font-bold text-green-900">{monthlyAnalytics.monthlyDeals}</p>
+                      <p className="text-xs text-green-600">Deals closed</p>
+                    </div>
+                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Leads */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-600">👥 Leads Masuk</p>
+                    <span className="text-xs text-slate-500">{monthlyAnalytics.monthlyLeads}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div>
+                      <p className="text-lg font-bold text-blue-900">{monthlyAnalytics.monthlyLeads}</p>
+                      <p className="text-xs text-blue-600">Leads masuk</p>
+                    </div>
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <UserPlus className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
