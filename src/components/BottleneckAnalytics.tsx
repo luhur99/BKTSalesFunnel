@@ -25,13 +25,12 @@ interface SourceConversion {
   conversionRate: number;
 }
 
-interface WeeklyAnalytics {
-  dayWithMostLeads: { day: string; count: number };
-  dayWithMostDeals: { day: string; count: number };
+interface MonthlyDayAnalytics {
+  topDaysLeads: { day: string; count: number }[];
+  topDaysDeals: { day: string; count: number }[];
   stageDistribution: { stage: string; count: number; percentage: number }[];
   leadsPerDay: { day: string; count: number }[];
   dealsPerDay: { day: string; count: number }[];
-  tDayOfWeek: { day: string; count: number }[];
 }
 
 interface MonthlyAnalytics {
@@ -54,7 +53,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
   const [loading, setLoading] = useState(true);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
   const [sourceConversion, setSourceConversion] = useState<SourceConversion[]>([]);
-  const [weeklyAnalytics, setWeeklyAnalytics] = useState<WeeklyAnalytics | null>(null);
+  const [monthlyDayAnalytics, setMonthlyDayAnalytics] = useState<MonthlyDayAnalytics | null>(null);
   const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlyAnalytics | null>(null);
 
   useEffect(() => {
@@ -70,7 +69,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       // Load source breakdown and conversion
       await loadSourceBreakdown();
       await loadSourceConversion();
-      await loadMonthlyLeadAnalytics();
+      await loadMonthlyDayAnalytics();
       await loadMonthlyAnalytics();
     } catch (error) {
       console.error("Error loading analytics:", error);
@@ -184,53 +183,59 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     }
   };
 
-  const loadMonthlyLeadAnalytics = async () => {
+  const loadMonthlyDayAnalytics = async () => {
     try {
       const leads = await db.leads.getAll();
       
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      // Helper to check if date is in current month
+      const isCurrentMonth = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      };
+
+      // Filter leads for current month
+      const monthLeads = leads.filter(l => isCurrentMonth(l.created_at));
+      const monthDeals = leads.filter(l => 
+        l.status?.trim().toLowerCase() === "deal" && 
+        isCurrentMonth(l.updated_at)
+      );
+
       // Indonesian day names
       const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
       
-      // 1. Count leads per day of week (based on created_at)
-      const leadsPerDay = new Map<string, number>();
-      dayNames.forEach(day => leadsPerDay.set(day, 0));
-      
-      leads.forEach(lead => {
+      // 1. Count leads per day
+      const leadsPerDayMap = new Map<string, number>();
+      monthLeads.forEach(lead => {
         const date = new Date(lead.created_at);
-        const dayIndex = date.getDay();
-        const dayName = dayNames[dayIndex];
-        leadsPerDay.set(dayName, (leadsPerDay.get(dayName) || 0) + 1);
+        const dayName = dayNames[date.getDay()];
+        leadsPerDayMap.set(dayName, (leadsPerDayMap.get(dayName) || 0) + 1);
       });
       
-      // 2. Count deals per day of week (based on updated_at when status became Deal)
-      const dealsPerDay = new Map<string, number>();
-      dayNames.forEach(day => dealsPerDay.set(day, 0));
-      
-      const dealLeads = leads.filter(l => l.status?.trim().toLowerCase() === "deal");
-      dealLeads.forEach(lead => {
+      // 2. Count deals per day
+      const dealsPerDayMap = new Map<string, number>();
+      monthDeals.forEach(lead => {
         const date = new Date(lead.updated_at);
-        const dayIndex = date.getDay();
-        const dayName = dayNames[dayIndex];
-        dealsPerDay.set(dayName, (dealsPerDay.get(dayName) || 0) + 1);
+        const dayName = dayNames[date.getDay()];
+        dealsPerDayMap.set(dayName, (dealsPerDayMap.get(dayName) || 0) + 1);
       });
       
-      // 3. Find day with most leads
-      let maxLeadsDay = { day: "Senin", count: 0 };
-      leadsPerDay.forEach((count, day) => {
-        if (count > maxLeadsDay.count) {
-          maxLeadsDay = { day, count };
-        }
-      });
+      // 3. Get Top 2 Days for Leads
+      const topDaysLeads = Array.from(leadsPerDayMap.entries())
+        .map(([day, count]) => ({ day, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 2);
       
-      // 4. Find day with most deals
-      let maxDealsDay = { day: "Senin", count: 0 };
-      dealsPerDay.forEach((count, day) => {
-        if (count > maxDealsDay.count) {
-          maxDealsDay = { day, count };
-        }
-      });
+      // 4. Get Top 2 Days for Deals
+      const topDaysDeals = Array.from(dealsPerDayMap.entries())
+        .map(([day, count]) => ({ day, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 2);
       
-      // 5. Stage distribution (Follow Up vs Broadcast)
+      // 5. Monthly Stage Distribution (Where are this month's leads now?)
       const stages = await db.stages.getAll();
       const stageDistribution: { stage: string; count: number }[] = [];
       
@@ -238,8 +243,9 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       const followUpStages = stages.filter(s => s.funnel_type === "follow_up").sort((a, b) => a.stage_number - b.stage_number);
       const broadcastStages = stages.filter(s => s.funnel_type === "broadcast").sort((a, b) => a.stage_number - b.stage_number);
       
+      // Check distribution of monthLeads
       followUpStages.forEach(stage => {
-        const count = leads.filter(l => l.current_stage_id === stage.id && l.status === "active").length;
+        const count = monthLeads.filter(l => l.current_stage_id === stage.id).length;
         if (count > 0) {
           stageDistribution.push({
             stage: `FU ${stage.stage_number}: ${stage.stage_name}`,
@@ -249,7 +255,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       });
       
       broadcastStages.forEach(stage => {
-        const count = leads.filter(l => l.current_stage_id === stage.id && l.status === "active").length;
+        const count = monthLeads.filter(l => l.current_stage_id === stage.id).length;
         if (count > 0) {
           stageDistribution.push({
             stage: `BC ${stage.stage_number}: ${stage.stage_name}`,
@@ -258,26 +264,26 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
         }
       });
       
-      const totalActiveLeads = leads.filter(l => l.status === "active").length;
+      const totalMonthLeads = monthLeads.length;
       
       const stageDistributionWithPercentage = stageDistribution.map(s => ({
         ...s,
-        percentage: totalActiveLeads > 0 ? (s.count / totalActiveLeads) * 100 : 0
+        percentage: totalMonthLeads > 0 ? (s.count / totalMonthLeads) * 100 : 0
       }));
       
-      // Convert maps to arrays
-      const leadsPerDayArray = Array.from(leadsPerDay.entries()).map(([day, count]) => ({ day, count }));
-      const dealsPerDayArray = Array.from(dealsPerDay.entries()).map(([day, count]) => ({ day, count }));
+      // Convert maps to arrays for graphs if needed (optional)
+      const leadsPerDayArray = Array.from(leadsPerDayMap.entries()).map(([day, count]) => ({ day, count }));
+      const dealsPerDayArray = Array.from(dealsPerDayMap.entries()).map(([day, count]) => ({ day, count }));
       
-      setWeeklyAnalytics({
-        dayWithMostLeads: maxLeadsDay,
-        dayWithMostDeals: maxDealsDay,
+      setMonthlyDayAnalytics({
+        topDaysLeads,
+        topDaysDeals,
         stageDistribution: stageDistributionWithPercentage,
         leadsPerDay: leadsPerDayArray,
         dealsPerDay: dealsPerDayArray
       });
     } catch (error) {
-      console.error("Error loading weekly analytics:", error);
+      console.error("Error loading monthly day analytics:", error);
     }
   };
 
@@ -571,59 +577,71 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
               <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
                 <Calendar className="w-4 h-4 text-indigo-600" />
               </div>
-              Analisa Mingguan
+              Analisa Lead Bulanan
             </CardTitle>
-            <CardDescription className="text-xs">Data lead 7 hari terakhir</CardDescription>
+            <CardDescription className="text-xs">Data harian dalam bulan ini</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!weeklyAnalytics ? (
+            {!monthlyDayAnalytics ? (
               <p className="text-sm text-slate-500 text-center py-4">Loading...</p>
             ) : (
               <>
-                {/* Day with Most Leads */}
+                {/* Top 2 Days Lead Masuk */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-slate-600">📅 Lead Masuk Terbanyak</p>
-                    <span className="text-xs text-slate-500">Hari ini minggu</span>
+                    <span className="text-xs text-slate-500">Bulan Ini</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div>
-                      <p className="text-lg font-bold text-blue-900">{weeklyAnalytics.dayWithMostLeads.day}</p>
-                      <p className="text-xs text-blue-600">{weeklyAnalytics.dayWithMostLeads.count} leads masuk</p>
-                    </div>
-                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <UserPlus className="w-5 h-5 text-white" />
-                    </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 space-y-2">
+                    {monthlyDayAnalytics.topDaysLeads.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center">Belum ada data</p>
+                    ) : (
+                      monthlyDayAnalytics.topDaysLeads.map((item, idx) => (
+                        <div key={item.day} className="flex items-center justify-between p-2 bg-white/50 rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-blue-800 w-4">{idx + 1}.</span>
+                            <span className="text-sm font-medium text-slate-700">{item.day}</span>
+                          </div>
+                          <span className="text-xs font-bold text-blue-600">{item.count} leads</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
-                {/* Day with Most Deals */}
+                {/* Top 2 Days Closing */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium text-slate-600">💰 Closing Terbanyak</p>
-                    <span className="text-xs text-slate-500">Deal terbanyak</span>
+                    <span className="text-xs text-slate-500">Bulan Ini</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div>
-                      <p className="text-lg font-bold text-green-900">{weeklyAnalytics.dayWithMostDeals.day}</p>
-                      <p className="text-xs text-green-600">{weeklyAnalytics.dayWithMostDeals.count} deals closed</p>
-                    </div>
-                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-white" />
-                    </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-2 space-y-2">
+                    {monthlyDayAnalytics.topDaysDeals.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center">Belum ada deals</p>
+                    ) : (
+                      monthlyDayAnalytics.topDaysDeals.map((item, idx) => (
+                        <div key={item.day} className="flex items-center justify-between p-2 bg-white/50 rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-green-800 w-4">{idx + 1}.</span>
+                            <span className="text-sm font-medium text-slate-700">{item.day}</span>
+                          </div>
+                          <span className="text-xs font-bold text-green-600">{item.count} deals</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
                 {/* Stage Distribution */}
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-slate-600">📍 Distribusi Stage (Active Leads)</p>
-                  {weeklyAnalytics.stageDistribution.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-2">Tidak ada active leads</p>
+                  <p className="text-xs font-medium text-slate-600">📍 Distribusi Stage (Bulan Ini)</p>
+                  {monthlyDayAnalytics.stageDistribution.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-2">Tidak ada leads bulan ini</p>
                   ) : (
                     <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {weeklyAnalytics.stageDistribution.map((stage, index) => (
+                      {monthlyDayAnalytics.stageDistribution.map((stage, index) => (
                         <div key={index} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-700">{stage.stage}</span>
+                          <span className="text-slate-700 truncate max-w-[150px]" title={stage.stage}>{stage.stage}</span>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-900">{stage.count}</span>
                             <span className="text-slate-500">({stage.percentage.toFixed(1)}%)</span>
