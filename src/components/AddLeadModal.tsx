@@ -176,8 +176,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
 
     try {
       // 1. Validation
-      if (!formData.name || formData.name.trim() === "") {
-        throw new Error("Nama Lead wajib diisi!");
+      if (!formData.phone || formData.phone.trim() === "") {
+        throw new Error("No. Phone / WhatsApp wajib diisi!");
       }
 
       if (!formData.source_id) {
@@ -202,15 +202,15 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
 
       // 2. Prepare Payload
       const payload = {
-        name: formData.name.trim(),
+        name: formData.name.trim() || null,
         email: formData.email?.trim() || null,
-        phone: formData.phone?.trim() || null,
+        phone: formData.phone.trim(),
         company: formData.company?.trim() || null,
         source_id: formData.source_id,
         current_stage_id: stageId,
         status: formData.status as any,
         custom_labels: formData.custom_labels,
-        last_response_note: formData.notes?.trim() || null, // Map notes to last_response_note
+        last_response_note: formData.notes?.trim() || null,
         deal_value: formData.deal_value ? Number(formData.deal_value) : null
       };
 
@@ -233,7 +233,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       
       // User friendly error mapping
       if (err.code === "23502") {
-        errorMessage = "Data tidak lengkap: Nama lead wajib diisi.";
+        errorMessage = "Data tidak lengkap: No. Phone / WhatsApp wajib diisi.";
       } else if (err.message?.includes("fetch")) {
         errorMessage = "Gagal terhubung ke server. Periksa koneksi internet Anda.";
       }
@@ -245,7 +245,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   };
 
   const isFormValid = () => {
-    return formData.name.trim() !== "" && formData.source_id !== "";
+    return formData.phone.trim() !== "" && formData.source_id !== "";
   };
 
   return (
@@ -276,7 +276,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
               
               <div>
                 <Label htmlFor="name" className="text-sm font-medium">
-                  Nama <span className="text-red-500">*</span>
+                  Nama
                 </Label>
                 <Input
                   id="name"
@@ -284,7 +284,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Contoh: Budi Santoso"
                   className="mt-1 bg-white"
-                  required
                 />
               </div>
 
