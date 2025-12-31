@@ -9,6 +9,7 @@ import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
 
 interface BottleneckAnalyticsProps {
   key?: string;
+  refreshTrigger?: any;
 }
 
 interface SourceBreakdown {
@@ -17,14 +18,14 @@ interface SourceBreakdown {
   percentage: number;
 }
 
-export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
+export function BottleneckAnalytics({ key, refreshTrigger }: BottleneckAnalyticsProps) {
   const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
 
   useEffect(() => {
     loadAnalytics();
-  }, [key]);
+  }, [key, refreshTrigger]);
 
   const loadAnalytics = async () => {
     try {

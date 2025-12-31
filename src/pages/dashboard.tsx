@@ -288,7 +288,7 @@ export default function Dashboard() {
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
-              <BottleneckAnalytics key={`analytics-${refreshTrigger}`} />
+              <BottleneckAnalytics refreshTrigger={refreshTrigger} />
             </TabsContent>
           </Tabs>
         </main>
