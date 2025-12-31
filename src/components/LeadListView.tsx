@@ -18,7 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download, Filter, X } from "lucide-react";
 import { Lead, Stage, FunnelType } from "@/types/lead";
 import { db } from "@/lib/supabase";
 import * as XLSX from "xlsx";
@@ -29,6 +39,13 @@ interface LeadListViewProps {
   refreshTrigger?: number;
 }
 
+interface DateFilter {
+  type: "none" | "monthly" | "custom";
+  startDate: string | null;
+  endDate: string | null;
+  monthLabel?: string;
+}
+
 export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: LeadListViewProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
@@ -36,6 +53,15 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFunnel, setFilterFunnel] = useState<"all" | FunnelType>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "deal" | "lost">("active");
+  const [dateFilter, setDateFilter] = useState<DateFilter>({
+    type: "none",
+    startDate: null,
+    endDate: null,
+  });
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const [tempMonth, setTempMonth] = useState("");
+  const [tempStartDate, setTempStartDate] = useState("");
+  const [tempEndDate, setTempEndDate] = useState("");
 
   useEffect(() => {
     loadData();
@@ -55,6 +81,53 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyMonthlyFilter = () => {
+    if (!tempMonth) return;
+    
+    const [year, month] = tempMonth.split("-");
+    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
+    
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+    const monthLabel = `${monthNames[parseInt(month) - 1]} ${year}`;
+    
+    setDateFilter({
+      type: "monthly",
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      monthLabel,
+    });
+    setDateDialogOpen(false);
+  };
+
+  const applyCustomFilter = () => {
+    if (!tempStartDate || !tempEndDate) return;
+    
+    const startDate = new Date(tempStartDate);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(tempEndDate);
+    endDate.setHours(23, 59, 59, 999);
+    
+    setDateFilter({
+      type: "custom",
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    });
+    setDateDialogOpen(false);
+  };
+
+  const resetDateFilter = () => {
+    setDateFilter({
+      type: "none",
+      startDate: null,
+      endDate: null,
+    });
+    setTempMonth("");
+    setTempStartDate("");
+    setTempEndDate("");
   };
 
   const handleExportToExcel = () => {
@@ -93,14 +166,38 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
     ];
     ws["!cols"] = colWidths;
     
-    XLSX.writeFile(wb, `BKT-Leads-Export-${new Date().toISOString().split("T")[0]}.xlsx`);
+    let filename = "BKT-Leads-Export";
+    if (dateFilter.type === "monthly" && dateFilter.monthLabel) {
+      filename += `-${dateFilter.monthLabel.replace(" ", "-")}`;
+    } else if (dateFilter.type === "custom") {
+      const start = formatDate(dateFilter.startDate);
+      const end = formatDate(dateFilter.endDate);
+      filename += `-${start}-to-${end}`;
+    } else {
+      filename += `-${new Date().toISOString().split("T")[0]}`;
+    }
+    
+    XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
   const filteredLeads = leads
     .filter(lead => {
+      // Status filter
       if (filterStatus !== "all" && lead.status !== filterStatus) return false;
+      
+      // Funnel filter
       if (filterFunnel !== "all" && lead.current_funnel !== filterFunnel) return false;
       
+      // Date filter
+      if (dateFilter.type !== "none" && dateFilter.startDate && dateFilter.endDate) {
+        const leadDate = new Date(lead.created_at);
+        const startDate = new Date(dateFilter.startDate);
+        const endDate = new Date(dateFilter.endDate);
+        
+        if (leadDate < startDate || leadDate > endDate) return false;
+      }
+      
+      // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return (
@@ -151,6 +248,15 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
     });
   };
 
+  const getDateFilterLabel = () => {
+    if (dateFilter.type === "monthly" && dateFilter.monthLabel) {
+      return dateFilter.monthLabel;
+    } else if (dateFilter.type === "custom" && dateFilter.startDate && dateFilter.endDate) {
+      return `${formatDate(dateFilter.startDate)} - ${formatDate(dateFilter.endDate)}`;
+    }
+    return "Filter Tanggal";
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -198,14 +304,145 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
           </SelectContent>
         </Select>
 
+        <Dialog open={dateDialogOpen} onOpenChange={setDateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button 
+              variant={dateFilter.type !== "none" ? "default" : "outline"} 
+              className="gap-2 relative"
+            >
+              <Calendar className="w-4 h-4" />
+              {getDateFilterLabel()}
+              {dateFilter.type !== "none" && (
+                <Badge className="ml-2 bg-white/20 hover:bg-white/30 text-white border-0 px-1.5 py-0">
+                  ✓
+                </Badge>
+              )}
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Filter Berdasarkan Tanggal</DialogTitle>
+              <DialogDescription>
+                Pilih periode tanggal untuk filter leads berdasarkan "Date In" (tanggal masuk)
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Tabs defaultValue="monthly" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="monthly">Filter Bulanan</TabsTrigger>
+                <TabsTrigger value="custom">Custom Range</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="monthly" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="month">Pilih Bulan</Label>
+                  <Input
+                    id="month"
+                    type="month"
+                    value={tempMonth}
+                    onChange={(e) => setTempMonth(e.target.value)}
+                    className="w-full"
+                    max={new Date().toISOString().slice(0, 7)}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Contoh: Pilih "Desember 2025" untuk melihat semua leads yang masuk di bulan tersebut
+                  </p>
+                </div>
+                
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDateDialogOpen(false)}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    onClick={applyMonthlyFilter}
+                    disabled={!tempMonth}
+                  >
+                    Terapkan Filter
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="custom" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Tanggal Mulai</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={tempStartDate}
+                      onChange={(e) => setTempStartDate(e.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate">Tanggal Akhir</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={tempEndDate}
+                      onChange={(e) => setTempEndDate(e.target.value)}
+                      max={new Date().toISOString().split("T")[0]}
+                      min={tempStartDate}
+                    />
+                  </div>
+                </div>
+                
+                <p className="text-xs text-slate-500">
+                  Pilih range tanggal untuk filter leads yang masuk dalam periode tersebut
+                </p>
+                
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDateDialogOpen(false)}
+                  >
+                    Batal
+                  </Button>
+                  <Button
+                    onClick={applyCustomFilter}
+                    disabled={!tempStartDate || !tempEndDate}
+                  >
+                    Terapkan Filter
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+
+        {dateFilter.type !== "none" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={resetDateFilter}
+            className="text-slate-500 hover:text-slate-700"
+            title="Reset filter tanggal"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        )}
+
         <Button onClick={handleExportToExcel} variant="outline" className="gap-2">
           <Download className="w-4 h-4" />
           Export Excel
         </Button>
       </div>
 
-      <div className="text-sm text-slate-600">
-        Menampilkan <strong>{filteredLeads.length}</strong> dari {leads.length} leads
+      <div className="flex items-center gap-3 text-sm text-slate-600">
+        <span>
+          Menampilkan <strong>{filteredLeads.length}</strong> dari {leads.length} leads
+        </span>
+        
+        {dateFilter.type !== "none" && (
+          <Badge variant="outline" className="gap-1">
+            <Calendar className="w-3 h-3" />
+            {getDateFilterLabel()}
+          </Badge>
+        )}
       </div>
 
       <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
@@ -227,7 +464,10 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
             {filteredLeads.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-12 text-slate-500">
-                  Tidak ada leads ditemukan
+                  {dateFilter.type !== "none" 
+                    ? `Tidak ada leads ditemukan untuk periode ${getDateFilterLabel()}`
+                    : "Tidak ada leads ditemukan"
+                  }
                 </TableCell>
               </TableRow>
             ) : (
