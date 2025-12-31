@@ -69,6 +69,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
       "Last Response": lead.last_response_note || "-",
       "Status": lead.status === "active" ? "Aktif" : lead.status === "deal" ? "Deal" : "Lost",
       "Custom Labels": lead.custom_labels?.join(", ") || "-",
+      "Date In": formatDate(lead.created_at),
       "Last Update": formatDate(lead.updated_at)
     }));
 
@@ -87,6 +88,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
       { wch: 40 }, // Last Response
       { wch: 10 }, // Status
       { wch: 30 }, // Custom Labels
+      { wch: 15 }, // Date In
       { wch: 15 }  // Last Update
     ];
     ws["!cols"] = colWidths;
@@ -216,6 +218,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
               <TableHead className="font-semibold">Stage</TableHead>
               <TableHead className="font-semibold">Last Response</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">Date In</TableHead>
               <TableHead className="font-semibold">Last Update</TableHead>
               <TableHead className="font-semibold text-center">Actions</TableHead>
             </TableRow>
@@ -223,7 +226,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
           <TableBody>
             {filteredLeads.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-slate-500">
+                <TableCell colSpan={9} className="text-center py-12 text-slate-500">
                   Tidak ada leads ditemukan
                 </TableCell>
               </TableRow>
@@ -293,6 +296,12 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                   </TableCell>
                   <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
                     {getStatusBadge(lead.status)}
+                  </TableCell>
+                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                    <div className="flex items-center gap-1 text-sm text-slate-600">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(lead.created_at)}
+                    </div>
                   </TableCell>
                   <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
                     <div className="flex items-center gap-1 text-sm text-slate-600">
