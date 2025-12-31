@@ -96,10 +96,33 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
         console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
       }
       
+      // 🔍 DEBUG: Log all lead statuses to check format
+      console.log("🔍 DEBUG: All lead statuses:", leads.map(l => ({ 
+        id: l.id, 
+        name: l.name, 
+        status: l.status,
+        statusType: typeof l.status,
+        statusTrimmed: l.status?.trim(),
+        statusLower: l.status?.toLowerCase()
+      })));
+      
       const sourceMap = new Map<string, { total: number; deals: number }>();
       leads.forEach(lead => {
         const sourceName = lead.source?.name || "Unknown";
-        const isDeal = lead.status === "Deal";
+        
+        // 🔧 FIX: Case-insensitive status check with trim
+        const normalizedStatus = lead.status?.trim().toLowerCase();
+        const isDeal = normalizedStatus === "deal";
+        
+        // 🔍 DEBUG: Log each lead processing
+        if (normalizedStatus === "deal") {
+          console.log("✅ DEAL FOUND:", {
+            name: lead.name,
+            source: sourceName,
+            status: lead.status,
+            normalized: normalizedStatus
+          });
+        }
         
         if (!sourceMap.has(sourceName)) {
           sourceMap.set(sourceName, { total: 0, deals: 0 });
@@ -109,6 +132,14 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
         current.total += 1;
         if (isDeal) current.deals += 1;
       });
+      
+      // 🔍 DEBUG: Log final sourceMap
+      console.log("🔍 DEBUG: Source map after processing:", Array.from(sourceMap.entries()).map(([source, data]) => ({
+        source,
+        total: data.total,
+        deals: data.deals,
+        rate: data.total > 0 ? (data.deals / data.total * 100).toFixed(1) + '%' : '0%'
+      })));
       
       const conversions: SourceConversion[] = Array.from(sourceMap.entries()).map(([source, data]) => ({
         source,
