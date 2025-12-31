@@ -88,6 +88,14 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     try {
       const leads = await db.leads.getAll();
       
+      // Debug logging
+      console.log("🔍 DEBUG: Total leads fetched:", leads.length);
+      if (leads.length > 0) {
+        console.log("🔍 DEBUG: Sample lead structure:", leads[0]);
+        console.log("🔍 DEBUG: Lead[0] source object:", leads[0].source);
+        console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
+      }
+      
       const sourceMap = new Map<string, { total: number; deals: number }>();
       leads.forEach(lead => {
         const sourceName = lead.source?.name || "Unknown";
