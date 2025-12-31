@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -177,8 +177,8 @@ export type Database = {
           id: string
           last_response_date: string | null
           last_response_note: string | null
-          name: string
-          phone: string | null
+          name: string | null
+          phone: string
           source_id: string | null
           status: Database["public"]["Enums"]["lead_status"] | null
           updated_at: string | null
@@ -194,8 +194,8 @@ export type Database = {
           id?: string
           last_response_date?: string | null
           last_response_note?: string | null
-          name: string
-          phone?: string | null
+          name?: string | null
+          phone: string
           source_id?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
           updated_at?: string | null
@@ -211,8 +211,8 @@ export type Database = {
           id?: string
           last_response_date?: string | null
           last_response_note?: string | null
-          name?: string
-          phone?: string | null
+          name?: string | null
+          phone?: string
           source_id?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
           updated_at?: string | null
