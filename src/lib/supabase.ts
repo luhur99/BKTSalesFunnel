@@ -446,6 +446,10 @@ export const db = {
 
       // Real implementation with Supabase transaction
       try {
+        console.log("🔵 SUPABASE - moveToStage started");
+        console.log("📊 Lead ID:", leadId);
+        console.log("📊 Target Stage ID:", toStageId);
+        
         // Get current lead info
         const { data: lead, error: leadError } = await supabase
           .from("leads")
@@ -453,7 +457,12 @@ export const db = {
           .eq("id", leadId)
           .single();
         
-        if (leadError) throw leadError;
+        if (leadError) {
+          console.error("❌ Error fetching lead:", leadError);
+          throw leadError;
+        }
+        
+        console.log("✅ Current lead info:", lead);
 
         // Get target stage info
         const { data: toStage, error: stageError } = await supabase
@@ -462,10 +471,16 @@ export const db = {
           .eq("id", toStageId)
           .single();
         
-        if (stageError) throw stageError;
+        if (stageError) {
+          console.error("❌ Error fetching stage:", stageError);
+          throw stageError;
+        }
+        
+        console.log("✅ Target stage info:", toStage);
 
         // Create history record
-        await supabase.from("lead_stage_history").insert([{
+        console.log("📝 Creating history record...");
+        const { error: historyError } = await supabase.from("lead_stage_history").insert([{
           lead_id: leadId,
           from_stage_id: lead.current_stage_id,
           to_stage_id: toStageId,
@@ -476,9 +491,17 @@ export const db = {
           moved_by: userId,
           moved_at: new Date().toISOString()
         }]);
+        
+        if (historyError) {
+          console.error("❌ Error creating history:", historyError);
+          throw historyError;
+        }
+        
+        console.log("✅ History record created");
 
         // Update lead
-        await supabase
+        console.log("📝 Updating lead...");
+        const { error: updateError } = await supabase
           .from("leads")
           .update({
             current_stage_id: toStageId,
@@ -486,10 +509,18 @@ export const db = {
             updated_at: new Date().toISOString()
           })
           .eq("id", leadId);
+        
+        if (updateError) {
+          console.error("❌ Error updating lead:", updateError);
+          throw updateError;
+        }
+        
+        console.log("✅ Lead updated successfully");
+        console.log("🎉 MOVE STAGE COMPLETED!");
 
         // Check if moved to stage 10 broadcast -> auto LOST (handled by trigger)
       } catch (error) {
-        console.error("Error moving lead to stage:", error);
+        console.error("❌ moveToStage - Fatal error:", error);
         throw error;
       }
     }

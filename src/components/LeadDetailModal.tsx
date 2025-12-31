@@ -64,13 +64,25 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
     try {
       setIsSubmitting(true);
+      
+      console.log("🔄 MOVE STAGE - Starting...");
+      console.log("📊 Lead ID:", lead.id);
+      console.log("📊 Current Stage:", lead.current_stage_id);
+      console.log("📊 Target Stage:", moveToStage);
+      console.log("📊 Reason: manual_move");
+      console.log("📊 Notes:", moveNotes);
+      
       await db.leads.moveToStage(lead.id, moveToStage, "manual_move", moveNotes, "Sales User");
+      
+      console.log("✅ MOVE STAGE - Success!");
+      
       setMoveToStage("");
       setMoveNotes("");
       onUpdate();
       loadLeadData();
     } catch (error) {
-      console.error("Error moving stage:", error);
+      console.error("❌ MOVE STAGE - Error:", error);
+      alert(`Gagal memindahkan lead: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
