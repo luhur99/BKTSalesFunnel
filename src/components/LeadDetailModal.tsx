@@ -79,13 +79,16 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       setMoveToStage("");
       setMoveNotes("");
       
-      // CRITICAL FIX: Call onUpdate first and wait a bit for refresh
+      // CRITICAL FIX: Call onUpdate first and wait for parent refresh
+      console.log("🔄 Refreshing parent dashboard...");
       onUpdate(); // Refresh parent (dashboard/kanban)
       
-      // Wait 100ms for state updates to propagate before closing
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait 500ms for parent state updates to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      onClose(); // Close modal to force refresh with new data
+      console.log("🔄 Closing modal...");
+      onClose(); // Close modal after parent refreshed
+      
     } catch (error: any) {
       console.error("❌ MOVE STAGE - Error:", error);
       
@@ -142,14 +145,17 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       
+      console.log("🔄 Refreshing parent dashboard...");
       onUpdate();
       
       // Wait for state updates before closing
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
+      console.log("🔄 Closing modal...");
       onClose(); // Close modal to force refresh
     } catch (error) {
       console.error("Error moving to broadcast:", error);
+      alert("❌ Gagal memindahkan lead ke Broadcast. Silakan coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -171,14 +177,17 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       
+      console.log("🔄 Refreshing parent dashboard...");
       onUpdate();
       
       // Wait for state updates before closing
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
+      console.log("🔄 Closing modal...");
       onClose(); // Close modal to force refresh
     } catch (error) {
       console.error("Error moving to follow up:", error);
+      alert("❌ Gagal memindahkan lead ke Follow Up. Silakan coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
