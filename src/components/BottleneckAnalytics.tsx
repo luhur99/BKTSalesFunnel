@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook, Globe, Share2, UserPlus, Target } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook, Globe, Share2, UserPlus, Target, Calendar } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
 
@@ -25,11 +25,20 @@ interface SourceConversion {
   conversionRate: number;
 }
 
+interface WeeklyAnalytics {
+  dayWithMostLeads: { day: string; count: number };
+  dayWithMostDeals: { day: string; count: number };
+  stageDistribution: { stage: string; count: number; percentage: number }[];
+  leadsPerDay: { day: string; count: number }[];
+  dealsPerDay: { day: string; count: number }[];
+}
+
 export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps) {
   const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
   const [sourceConversion, setSourceConversion] = useState<SourceConversion[]>([]);
+  const [weeklyAnalytics, setWeeklyAnalytics] = useState<WeeklyAnalytics | null>(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -44,6 +53,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       // Load source breakdown and conversion
       await loadSourceBreakdown();
       await loadSourceConversion();
+      await loadWeeklyAnalytics();
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
@@ -153,6 +163,103 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       setSourceConversion(conversions);
     } catch (error) {
       console.error("Error loading source conversion:", error);
+    }
+  };
+
+  const loadWeeklyAnalytics = async () => {
+    try {
+      const leads = await db.leads.getAll();
+      
+      // Indonesian day names
+      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+      
+      // 1. Count leads per day of week (based on created_at)
+      const leadsPerDay = new Map<string, number>();
+      dayNames.forEach(day => leadsPerDay.set(day, 0));
+      
+      leads.forEach(lead => {
+        const date = new Date(lead.created_at);
+        const dayIndex = date.getDay();
+        const dayName = dayNames[dayIndex];
+        leadsPerDay.set(dayName, (leadsPerDay.get(dayName) || 0) + 1);
+      });
+      
+      // 2. Count deals per day of week (based on updated_at when status became Deal)
+      const dealsPerDay = new Map<string, number>();
+      dayNames.forEach(day => dealsPerDay.set(day, 0));
+      
+      const dealLeads = leads.filter(l => l.status?.trim().toLowerCase() === "deal");
+      dealLeads.forEach(lead => {
+        const date = new Date(lead.updated_at);
+        const dayIndex = date.getDay();
+        const dayName = dayNames[dayIndex];
+        dealsPerDay.set(dayName, (dealsPerDay.get(dayName) || 0) + 1);
+      });
+      
+      // 3. Find day with most leads
+      let maxLeadsDay = { day: "Senin", count: 0 };
+      leadsPerDay.forEach((count, day) => {
+        if (count > maxLeadsDay.count) {
+          maxLeadsDay = { day, count };
+        }
+      });
+      
+      // 4. Find day with most deals
+      let maxDealsDay = { day: "Senin", count: 0 };
+      dealsPerDay.forEach((count, day) => {
+        if (count > maxDealsDay.count) {
+          maxDealsDay = { day, count };
+        }
+      });
+      
+      // 5. Stage distribution (Follow Up vs Broadcast)
+      const stages = await db.stages.getAll();
+      const stageDistribution: { stage: string; count: number }[] = [];
+      
+      // Group by funnel type and stage number
+      const followUpStages = stages.filter(s => s.funnel_type === "follow_up").sort((a, b) => a.stage_number - b.stage_number);
+      const broadcastStages = stages.filter(s => s.funnel_type === "broadcast").sort((a, b) => a.stage_number - b.stage_number);
+      
+      followUpStages.forEach(stage => {
+        const count = leads.filter(l => l.current_stage_id === stage.id && l.status === "active").length;
+        if (count > 0) {
+          stageDistribution.push({
+            stage: `FU ${stage.stage_number}: ${stage.stage_name}`,
+            count
+          });
+        }
+      });
+      
+      broadcastStages.forEach(stage => {
+        const count = leads.filter(l => l.current_stage_id === stage.id && l.status === "active").length;
+        if (count > 0) {
+          stageDistribution.push({
+            stage: `BC ${stage.stage_number}: ${stage.stage_name}`,
+            count
+          });
+        }
+      });
+      
+      const totalActiveLeads = leads.filter(l => l.status === "active").length;
+      
+      const stageDistributionWithPercentage = stageDistribution.map(s => ({
+        ...s,
+        percentage: totalActiveLeads > 0 ? (s.count / totalActiveLeads) * 100 : 0
+      }));
+      
+      // Convert maps to arrays
+      const leadsPerDayArray = Array.from(leadsPerDay.entries()).map(([day, count]) => ({ day, count }));
+      const dealsPerDayArray = Array.from(dealsPerDay.entries()).map(([day, count]) => ({ day, count }));
+      
+      setWeeklyAnalytics({
+        dayWithMostLeads: maxLeadsDay,
+        dayWithMostDeals: maxDealsDay,
+        stageDistribution: stageDistributionWithPercentage,
+        leadsPerDay: leadsPerDayArray,
+        dealsPerDay: dealsPerDayArray
+      });
+    } catch (error) {
+      console.error("Error loading weekly analytics:", error);
     }
   };
 
@@ -338,16 +445,75 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-slate-200 bg-white">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600 mb-1">Leads Stuck</p>
-                <p className="text-3xl font-bold text-red-600">{stats.totalStuck}</p>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-indigo-600" />
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-            </div>
+              Analisa Mingguan
+            </CardTitle>
+            <CardDescription className="text-xs">Data lead 7 hari terakhir</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!weeklyAnalytics ? (
+              <p className="text-sm text-slate-500 text-center py-4">Loading...</p>
+            ) : (
+              <>
+                {/* Day with Most Leads */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-600">📅 Lead Masuk Terbanyak</p>
+                    <span className="text-xs text-slate-500">Hari ini minggu</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div>
+                      <p className="text-lg font-bold text-blue-900">{weeklyAnalytics.dayWithMostLeads.day}</p>
+                      <p className="text-xs text-blue-600">{weeklyAnalytics.dayWithMostLeads.count} leads masuk</p>
+                    </div>
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <UserPlus className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Day with Most Deals */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-600">💰 Closing Terbanyak</p>
+                    <span className="text-xs text-slate-500">Deal terbanyak</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div>
+                      <p className="text-lg font-bold text-green-900">{weeklyAnalytics.dayWithMostDeals.day}</p>
+                      <p className="text-xs text-green-600">{weeklyAnalytics.dayWithMostDeals.count} deals closed</p>
+                    </div>
+                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stage Distribution */}
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-600">📍 Distribusi Stage (Active Leads)</p>
+                  {weeklyAnalytics.stageDistribution.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-2">Tidak ada active leads</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {weeklyAnalytics.stageDistribution.map((stage, index) => (
+                        <div key={index} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-700">{stage.stage}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-900">{stage.count}</span>
+                            <span className="text-slate-500">({stage.percentage.toFixed(1)}%)</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
