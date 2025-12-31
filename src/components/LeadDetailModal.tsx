@@ -86,9 +86,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       await new Promise(resolve => setTimeout(resolve, 100));
       
       onClose(); // Close modal to force refresh with new data
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ MOVE STAGE - Error:", error);
-      alert(`Gagal memindahkan lead: ${error.message}`);
+      
+      // Enhanced error message for users
+      const errorMessage = error?.message || "Terjadi kesalahan saat memindahkan lead";
+      alert(`❌ Gagal memindahkan lead:\n\n${errorMessage}\n\nSilakan refresh halaman dan coba lagi.`);
     } finally {
       setIsSubmitting(false);
     }

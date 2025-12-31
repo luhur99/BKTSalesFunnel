@@ -453,7 +453,7 @@ export const db = {
         console.log("📊 Notes:", notes);
         console.log("📊 User ID:", userId);
         
-        // Get current lead info
+        // Step 1: Get current lead info
         console.log("🔍 STEP 1: Fetching current lead info...");
         const { data: lead, error: leadError } = await supabase
           .from("leads")
@@ -463,29 +463,52 @@ export const db = {
         
         if (leadError) {
           console.error("❌ Error fetching lead:", leadError);
-          throw leadError;
+          throw new Error(`Failed to fetch lead: ${leadError.message}`);
+        }
+        
+        if (!lead) {
+          throw new Error("Lead not found");
         }
         
         console.log("✅ Current lead info:", lead);
 
-        // Get target stage info
+        // Step 2: Get target stage info
         console.log("🔍 STEP 2: Fetching target stage info...");
         const { data: toStage, error: stageError } = await supabase
           .from("stages")
-          .select("funnel_type, stage_number")
+          .select("funnel_type, stage_number, stage_name")
           .eq("id", toStageId)
           .single();
         
         if (stageError) {
           console.error("❌ Error fetching stage:", stageError);
-          throw stageError;
+          throw new Error(`Failed to fetch target stage: ${stageError.message}`);
+        }
+        
+        if (!toStage) {
+          throw new Error("Target stage not found");
         }
         
         console.log("✅ Target stage info:", toStage);
 
-        // Create history record with proper timestamp
+        // Step 3: Verify from_stage_id exists (FK constraint check)
+        console.log("🔍 STEP 3: Verifying from_stage_id exists...");
+        const { data: fromStage, error: fromStageError } = await supabase
+          .from("stages")
+          .select("id, stage_name")
+          .eq("id", lead.current_stage_id)
+          .single();
+        
+        if (fromStageError || !fromStage) {
+          console.error("❌ Invalid from_stage_id:", lead.current_stage_id);
+          throw new Error(`Current stage ID is invalid. Please refresh the page and try again.`);
+        }
+        
+        console.log("✅ From stage verified:", fromStage);
+
+        // Step 4: Create history record with proper timestamp
         const movedAt = new Date().toISOString();
-        console.log("🔍 STEP 3: Creating history record with timestamp:", movedAt);
+        console.log("🔍 STEP 4: Creating history record with timestamp:", movedAt);
         
         const historyPayload = {
           lead_id: leadId,
@@ -511,13 +534,19 @@ export const db = {
           console.error("❌ History error code:", historyError.code);
           console.error("❌ History error details:", historyError.details);
           console.error("❌ History error hint:", historyError.hint);
-          throw historyError;
+          
+          // User-friendly error message
+          if (historyError.code === "23503") {
+            throw new Error("Database integrity error. Please refresh the page and try again.");
+          }
+          
+          throw new Error(`Failed to create movement history: ${historyError.message}`);
         }
         
         console.log("✅ History record created:", historyData);
 
-        // Update lead with new stage
-        console.log("🔍 STEP 4: Updating lead...");
+        // Step 5: Update lead with new stage
+        console.log("🔍 STEP 5: Updating lead...");
         const { error: updateError } = await supabase
           .from("leads")
           .update({
@@ -529,11 +558,11 @@ export const db = {
         
         if (updateError) {
           console.error("❌ Error updating lead:", updateError);
-          throw updateError;
+          throw new Error(`Failed to update lead: ${updateError.message}`);
         }
         
         console.log("✅ Lead updated successfully");
-        console.log("🎉 MOVE STAGE COMPLETED!");
+        console.log("🎉 moveToStage - Operation completed successfully!");
 
       } catch (error) {
         console.error("❌ moveToStage - Fatal error:", error);
