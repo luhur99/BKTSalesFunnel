@@ -284,42 +284,100 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     try {
       const leads = await db.leads.getAll();
       
-      // Debug logging
-      console.log("🔍 DEBUG: Total leads fetched:", leads.length);
-      if (leads.length > 0) {
-        console.log("🔍 DEBUG: Sample lead structure:", leads[0]);
-        console.log("🔍 DEBUG: Lead[0] source object:", leads[0].source);
-        console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonth = lastMonthDate.getMonth();
+      const lastMonthYear = lastMonthDate.getFullYear();
+
+      // Helper to check if date is in specific month/year
+      const isInMonth = (dateStr: string, month: number, year: number) => {
+        const d = new Date(dateStr);
+        return d.getMonth() === month && d.getFullYear() === year;
+      };
+
+      // 1. Filter Leads & Deals for Current Month
+      const thisMonthLeads = leads.filter(l => isInMonth(l.created_at, currentMonth, currentYear));
+      const thisMonthDeals = leads.filter(l => 
+        l.status?.trim().toLowerCase() === "deal" && 
+        isInMonth(l.updated_at, currentMonth, currentYear)
+      );
+
+      // 2. Filter Leads & Deals for Last Month
+      const lastMonthLeadsData = leads.filter(l => isInMonth(l.created_at, lastMonth, lastMonthYear));
+      const lastMonthDealsData = leads.filter(l => 
+        l.status?.trim().toLowerCase() === "deal" && 
+        isInMonth(l.updated_at, lastMonth, lastMonthYear)
+      );
+
+      // 3. Weekly Trends (Current Month)
+      const weeklyDealsMap = new Map<number, number>();
+      
+      // Initialize 4 weeks
+      for(let i=1; i<=4; i++) {
+        weeklyDealsMap.set(i, 0);
       }
-      
-      // 🔍 DEBUG: Log all lead statuses to check format
-      console.log("🔍 DEBUG: All lead statuses:", leads.map(l => ({ 
-        id: l.id, 
-        name: l.name, 
-        status: l.status,
-        statusType: typeof l.status,
-        statusTrimmed: l.status?.trim(),
-        statusLower: l.status?.toLowerCase()
-      })));
-      
-      // 🔧 FIX: Case-insensitive status check with trim
-      const dealLeads = leads.filter(l => l.status?.trim().toLowerCase() === "deal");
-      
-      // 🔍 DEBUG: Log final sourceMap
-      console.log("🔍 DEBUG: Deal leads count:", dealLeads.length);
-      
-      const totalLeads = leads.length;
-      const totalDeals = dealLeads.length;
-      
-      const month = new Date().toLocaleString("id-ID", { month: "long" });
-      
-      setMonthlyAnalytics({
-        weeklyDeals: [],
-        weeklyLeads: [],
-        monthlyDeals: totalDeals,
-        monthlyLeads: totalLeads,
-        month
+
+      thisMonthDeals.forEach(deal => {
+        const date = new Date(deal.updated_at);
+        const day = date.getDate();
+        const week = Math.min(Math.ceil(day / 7), 4); // Clamp to 4 weeks
+        weeklyDealsMap.set(week, (weeklyDealsMap.get(week) || 0) + 1);
       });
+
+      // 4. Conversion Rates
+      const thisMonthRate = thisMonthLeads.length > 0 
+        ? (thisMonthDeals.length / thisMonthLeads.length) * 100 
+        : 0;
+        
+      const lastMonthRate = lastMonthLeadsData.length > 0 
+        ? (lastMonthDealsData.length / lastMonthLeadsData.length) * 100 
+        : 0;
+
+      // 5. Top Sources (Current Month Deals)
+      const sourceMap = new Map<string, number>();
+      thisMonthDeals.forEach(deal => {
+        const sourceName = deal.source?.name || "Unknown";
+        sourceMap.set(sourceName, (sourceMap.get(sourceName) || 0) + 1);
+      });
+
+      const topSources = Array.from(sourceMap.entries())
+        .map(([source, count]) => ({
+          source,
+          deals: count,
+          percentage: thisMonthDeals.length > 0 ? (count / thisMonthDeals.length) * 100 : 0
+        }))
+        .sort((a, b) => b.deals - a.deals)
+        .slice(0, 3);
+
+      // 6. Growth Metrics
+      const leadsGrowth = lastMonthLeadsData.length > 0
+        ? ((thisMonthLeads.length - lastMonthLeadsData.length) / lastMonthLeadsData.length) * 100
+        : 0;
+
+      const dealsGrowth = lastMonthDealsData.length > 0
+        ? ((thisMonthDeals.length - lastMonthDealsData.length) / lastMonthDealsData.length) * 100
+        : 0;
+
+      const monthName = now.toLocaleString("id-ID", { month: "long" });
+
+      setMonthlyAnalytics({
+        weeklyDeals: Array.from(weeklyDealsMap.entries()).map(([week, count]) => ({ week, count })),
+        weeklyLeads: [], // Not used in UI but required by interface
+        monthlyDeals: thisMonthDeals.length,
+        monthlyLeads: thisMonthLeads.length,
+        month: monthName,
+        lastMonthDeals: lastMonthDealsData.length,
+        lastMonthLeads: lastMonthLeadsData.length,
+        conversionRate: thisMonthRate,
+        lastMonthConversionRate: lastMonthRate,
+        topSources,
+        leadsGrowth,
+        dealsGrowth
+      });
+
     } catch (error) {
       console.error("Error loading monthly analytics:", error);
     }
