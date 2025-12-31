@@ -24,7 +24,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
-  const [funnel, setFunnel] = useState<"follow_up" | "broadcast">("follow_up");
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -62,14 +61,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         notes: editLead.last_response_note || "",
         deal_value: editLead.deal_value || ""
       });
-      
-      // Determine funnel based on stage
-      if (editLead.current_stage_id && stages.length > 0) {
-        const stage = stages.find(s => s.id === editLead.current_stage_id);
-        if (stage) {
-          setFunnel(stage.funnel_type as "follow_up" | "broadcast");
-        }
-      }
     } else if (isOpen && !editLead) {
       // Reset form for new lead
       setFormData({
@@ -84,7 +75,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         notes: "",
         deal_value: ""
       });
-      setFunnel("follow_up");
     }
   }, [isOpen, editLead, stages]);
 
@@ -158,17 +148,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
     });
   };
 
-  // Update stage when funnel changes
-  const handleFunnelChange = (newFunnel: "follow_up" | "broadcast") => {
-    setFunnel(newFunnel);
-    
-    // Find first stage of new funnel
-    const firstStage = stages.find(s => s.funnel_type === newFunnel && s.stage_number === 1);
-    if (firstStage) {
-      setFormData(prev => ({ ...prev, current_stage_id: firstStage.id }));
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -192,7 +171,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       // Ensure stage is set
       let stageId = formData.current_stage_id;
       if (!stageId) {
-        const defaultStage = stages.find(s => s.funnel_type === funnel && s.stage_number === 1);
+        const defaultStage = stages.find(s => s.funnel_type === "follow_up" && s.stage_number === 1);
         if (defaultStage) {
           stageId = defaultStage.id;
         } else {
@@ -337,43 +316,6 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                 </div>
 
                 <div>
-                  <Label htmlFor="funnel">Funnel Type</Label>
-                  <Select 
-                    value={funnel} 
-                    onValueChange={(val: "follow_up" | "broadcast") => handleFunnelChange(val)}
-                  >
-                    <SelectTrigger className="mt-1 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="follow_up">Follow Up</SelectItem>
-                      <SelectItem value="broadcast">Broadcast</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="stage">Current Stage</Label>
-                  <Select 
-                    value={formData.current_stage_id} 
-                    onValueChange={(val) => setFormData({ ...formData, current_stage_id: val })}
-                  >
-                    <SelectTrigger className="mt-1 bg-white">
-                      <SelectValue placeholder="Pilih Stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stages
-                        .filter(s => s.funnel_type === funnel)
-                        .map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.stage_number}. {s.stage_name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label htmlFor="status">Status</Label>
                   <Select 
                     value={formData.status} 
@@ -389,6 +331,43 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="stage">Current Stage</Label>
+                <Select 
+                  value={formData.current_stage_id} 
+                  onValueChange={(val) => setFormData({ ...formData, current_stage_id: val })}
+                >
+                  <SelectTrigger className="mt-1 bg-white">
+                    <SelectValue placeholder="Pilih Stage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Follow Up Stages */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-blue-50">
+                      Follow Up Funnel
+                    </div>
+                    {stages
+                      .filter(s => s.funnel_type === "follow_up")
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          FU-{s.stage_number}: {s.stage_name}
+                        </SelectItem>
+                      ))}
+                    
+                    {/* Broadcast Stages */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-purple-50 mt-2">
+                      Broadcast Funnel
+                    </div>
+                    {stages
+                      .filter(s => s.funnel_type === "broadcast")
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          BC-{s.stage_number}: {s.stage_name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
