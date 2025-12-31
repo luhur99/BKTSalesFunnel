@@ -45,10 +45,13 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
     try {
       const leads = await db.leads.getAll();
       
-      // Group by source
+      // Group by source - ENSURE source is always a string
       const sourceMap = new Map<string, number>();
       leads.forEach(lead => {
-        const source = lead.source || "Unknown";
+        // ✅ FIX: Convert null/undefined to "Unknown" and ensure it's a string
+        const source = lead.source && typeof lead.source === "string" 
+          ? lead.source 
+          : "Unknown";
         sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
       });
       
@@ -69,7 +72,10 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
     }
   };
 
-  const getSourceIcon = (source: string) => {
+  const getSourceIcon = (source: string | null | undefined) => {
+    // ✅ FIX: Handle null/undefined source
+    if (!source || typeof source !== "string") return UserPlus;
+    
     const lowerSource = source.toLowerCase();
     if (lowerSource.includes("facebook")) return Facebook;
     if (lowerSource.includes("google")) return Globe;
@@ -229,7 +235,9 @@ export function BottleneckAnalytics({ key }: BottleneckAnalyticsProps) {
             </div>
           </CardContent>
         </Card>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-slate-200 bg-white">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
