@@ -36,7 +36,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
     status: "active",
     custom_labels: [] as string[],
     notes: "",
-    deal_value: "" as string | number
+    deal_value: "" as string | number,
+    date_in: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -59,7 +60,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         status: editLead.status || "active",
         custom_labels: Array.isArray(editLead.custom_labels) ? editLead.custom_labels : [],
         notes: editLead.last_response_note || "",
-        deal_value: editLead.deal_value || ""
+        deal_value: editLead.deal_value || "",
+        date_in: editLead.created_at ? new Date(editLead.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       });
     } else if (isOpen && !editLead) {
       // Reset form for new lead
@@ -73,7 +75,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         status: "active",
         custom_labels: [],
         notes: "",
-        deal_value: ""
+        deal_value: "",
+        date_in: new Date().toISOString().split('T')[0]
       });
     }
   }, [isOpen, editLead, stages]);
@@ -184,7 +187,8 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         status: formData.status as any,
         custom_labels: formData.custom_labels,
         last_response_note: formData.notes?.trim() || null,
-        deal_value: formData.deal_value ? Number(formData.deal_value) : null
+        deal_value: formData.deal_value ? Number(formData.deal_value) : null,
+        created_at: formData.date_in ? new Date(formData.date_in).toISOString() : new Date().toISOString()
       };
 
       console.log("🚀 Submitting payload:", payload);
@@ -390,6 +394,20 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                   placeholder="0"
                   className="mt-1"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="date_in">Tanggal Masuk Lead <span className="text-red-500">*</span></Label>
+                <Input
+                  id="date_in"
+                  type="date"
+                  value={formData.date_in}
+                  onChange={(e) => setFormData({ ...formData, date_in: e.target.value })}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="mt-1"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1">Tanggal lead ini pertama kali masuk ke sistem</p>
               </div>
 
               <div>
