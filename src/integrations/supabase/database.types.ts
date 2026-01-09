@@ -402,9 +402,9 @@ export type Database = {
       get_lead_journey_analytics: {
         Args: { p_lead_id: string }
         Returns: {
-          current_funnel: Database["public"]["Enums"]["funnel_type"]
+          current_funnel: string
           current_stage_name: string
-          current_status: Database["public"]["Enums"]["lead_status"]
+          current_status: string
           lead_id: string
           lead_name: string
           stages_history: Json
