@@ -126,10 +126,47 @@ graph LR
     C1[get_bottleneck_analytics] --> D
     C2[get_lead_journey_analytics] --> D
     C3[get_daily_stage_movements] --> D
+    C4[get_funnel_leakage_stats] --> D
+    C5[get_avg_time_per_stage] --> D
+    C6[get_heatmap_analytics] --> D
+    C7[get_follow_up_funnel_flow] --> D
     
     F --> G[Dashboard Charts]
     F --> H[Analytics Cards]
     F --> I[Journey Timeline]
+    F --> J[Funnel Flow Visualization]
+    F --> K[Heatmap Grid]
+```
+
+### **5. Analytics Report Page Flow** ✨ NEW
+
+```mermaid
+graph TD
+    A[User Opens Analytics Report] --> B[Load Analytics Header]
+    B --> C{Data Loading}
+    
+    C --> D[Fetch Funnel Leakage Stats]
+    C --> E[Fetch Stage Velocity]
+    C --> F[Fetch Heatmap Data]
+    C --> G[Fetch Bottleneck Warnings]
+    C --> H[Fetch Follow-Up Funnel Flow]
+    
+    D --> I[Display Funnel Health Cards]
+    E --> J[Display Velocity Chart]
+    F --> K[Display Heatmap Grid]
+    G --> L[Display Bottleneck Warnings]
+    H --> M[Display Funnel Flow Visualization]
+    
+    I --> N[Analytics Dashboard Ready]
+    J --> N
+    K --> N
+    L --> N
+    M --> N
+    
+    N --> O{User Interaction}
+    O -->|Filter by Date| P[Update All Charts]
+    O -->|View Details| Q[Show Detailed Metrics]
+    O -->|Export| R[Generate Report]
 ```
 
 ### **5. Page Navigation Flow**
@@ -351,6 +388,161 @@ Returns:
 }]
 
 Usage: Track daily activity, identify patterns
+```
+
+#### **D. Get Funnel Leakage Stats**
+```typescript
+Location: Supabase Function → get_funnel_leakage_stats()
+
+SQL Logic:
+1. Count total leads created
+2. Count leads that moved from Follow-Up to Broadcast (leaked)
+3. Calculate leakage percentage = (leaked / total) * 100
+
+Returns:
+{
+  total_leads: integer,
+  leaked_to_broadcast: integer,
+  leakage_percentage: decimal
+}
+
+Usage: Measure how many leads are falling out of Follow-Up funnel
+```
+
+#### **E. Get Stage Velocity**
+```typescript
+Location: Supabase Function → get_avg_time_per_stage()
+
+SQL Logic:
+1. For each stage, calculate average time leads spend before moving out
+2. Calculate hours = AVG(EXTRACT(EPOCH FROM (next_movement - entered)) / 3600)
+3. Count total leads that passed through each stage
+4. Order by stage_number
+
+Returns:
+[{
+  stage_name_out: string,
+  avg_hours: decimal,
+  total_leads_passed: integer
+}]
+
+Usage: Identify slow-moving stages, optimize sales velocity
+```
+
+#### **F. Get Heatmap Analytics**
+```typescript
+Location: Supabase Function → get_heatmap_analytics(target_type)
+
+Parameters:
+- target_type: 'deal' | 'all' (filter by lead outcome)
+
+SQL Logic:
+1. Extract day of week and hour from lead activities or movements
+2. GROUP BY day_name, hour_of_day
+3. Count activities/movements per time slot
+4. Filter by target_type if specified
+
+Returns:
+[{
+  day_name: string (Monday-Sunday),
+  hour_of_day: integer (0-23),
+  count: integer
+}]
+
+Usage: Identify best times for sales activities, optimize outreach timing
+```
+
+#### **G. Get Follow-Up Funnel Flow** ✨ NEW
+```typescript
+Location: Supabase Function → get_follow_up_funnel_flow()
+
+SQL Logic (LATEST WORKING VERSION):
+1. Create CTE to track maximum stage reached per lead
+   - WITH lead_max_stage AS (
+       SELECT lead_id, MAX(to_stage_number) as max_stage_reached
+       FROM lead_stage_history
+       WHERE to_funnel = 'follow_up'
+       GROUP BY lead_id
+     )
+2. For each Follow-Up stage:
+   - Count unique leads that reached this stage (max_stage >= current_stage)
+   - Count unique leads that progressed beyond (max_stage > current_stage)
+   - Calculate drops = entered - progressed
+   - Calculate drop_rate = (drops / entered) * 100
+   - Calculate conversion_rate = (progressed / entered) * 100
+3. Cast UUID to TEXT and VARCHAR to TEXT for type compatibility
+4. Handle NULL stages with COALESCE
+5. Order by stage_number ASC
+
+Returns:
+[{
+  stage_id: TEXT (UUID cast),
+  stage_name: TEXT,
+  stage_number: INTEGER,
+  funnel_type: TEXT,
+  leads_entered: BIGINT,
+  leads_progressed: BIGINT,
+  leads_dropped: BIGINT,
+  drop_rate: NUMERIC(5,2),
+  conversion_rate: NUMERIC(5,2)
+}]
+
+Technical Notes:
+- Uses lead journey analysis (not simple movement counts)
+- Ensures each lead counted only once per stage
+- Handles backward movements correctly
+- Produces mathematically valid percentages (0-100%)
+- Type casting required: UUID::TEXT, VARCHAR::TEXT
+
+Example Output:
+[
+  {
+    stage_id: "uuid",
+    stage_name: "New Lead",
+    stage_number: 1,
+    funnel_type: "follow_up",
+    leads_entered: 100,
+    leads_progressed: 85,
+    leads_dropped: 15,
+    drop_rate: 15.00,
+    conversion_rate: 85.00
+  },
+  ...
+]
+
+Usage: Visualize complete Follow-Up funnel flow, identify bottleneck stages
+Common Issues Fixed:
+- ✅ Ambiguous column references (use table aliases)
+- ✅ Query structure mismatch (match RETURNS TABLE exactly)
+- ✅ Type mismatches (cast UUID and VARCHAR to TEXT)
+- ✅ Negative drops/impossible conversion rates (use journey analysis)
+```
+
+#### **H. Get Bottleneck Warnings (Client-Side Logic)**
+```typescript
+Location: src/lib/supabase.ts → db.analytics.getBottleneckWarnings()
+
+Business Logic:
+1. Fetch stage velocity data (avg_time_per_stage)
+2. Calculate average hours across all stages
+3. Set threshold = average * 1.5
+4. Filter stages slower than threshold
+5. Assign severity:
+   - high: > average * 2
+   - medium: > threshold
+   - low: otherwise
+6. Sort by avg_hours DESC (worst first)
+
+Returns:
+[{
+  stage_name: string,
+  avg_hours: number,
+  severity: 'low' | 'medium' | 'high',
+  message: string,
+  total_leads: number
+}]
+
+Usage: Generate actionable warnings for slow-moving stages
 ```
 
 ### **3. Stage Management Functions**
@@ -651,7 +843,7 @@ Purpose: Automatically mark lead as LOST when reaching BC Stage 10
 │  │          │ │          │ │          │ │          │     │          │ │
 │  │ ┌──────┐ │ │ ┌──────┐ │ │ ┌──────┐ │ │ ┌──────┐ │     │ ┌──────┐ │ │
 │  │ │ John │ │ │ │ Jane │ │ │ │ Bob  │ │ │ │Alice │ │     │ │ Mike │ │ │
-│  │ │ Doe  │ │ │ │Smith │ │ │ │Wilson│ │ │ │Brown │ │     │ │Davis │ │ │
+│  │ │ Doe  │ │ │ │ Smith │ │ │ │Wilson│ │ │ │Brown │ │     │ │Davis │ │ │
 │  │ │💼 ABC │ │ │ │💼 XYZ│ │ │ │💼 LMN│ │ │ │💼 PQR│ │     │ │💼 STU│ │ │
 │  │ │📞 2d  │ │ │ │📧 1d │ │ │ │💬 3d │ │ │ │📞 5d │ │     │ │📧 1d │ │ │
 │  │ └──────┘ │ │ └──────┘ │ │ └──────┘ │ │ └──────┘ │     │ └──────┘ │ │
@@ -1200,9 +1392,9 @@ REFRESH MATERIALIZED VIEW daily_analytics;
 ### **Security Considerations**
 ```typescript
 // Row Level Security (RLS) - Future enhancement
--- Ensure sales team sees only their leads
--- Managers see all leads
--- Admins have full access
+// Ensure sales team sees only their leads
+// Managers see all leads
+// Admins have full access
 
 // Current state: All authenticated users see all data
 // Recommended: Implement RLS policies per user role
@@ -1237,6 +1429,224 @@ Future Enhancements:
 
 ---
 
+## 🔧 Troubleshooting Common Issues
+
+### **Database & RPC Function Errors**
+
+#### **1. "column reference is ambiguous"**
+```
+Error: column reference "stage_name" is ambiguous
+Location: Any RPC function with JOINs
+
+Cause: Multiple tables have columns with the same name
+
+Solution:
+- Always use table aliases (e.g., s.stage_name, h.lead_id)
+- Prefix ALL columns with their table alias
+- Example:
+  SELECT 
+    s.id AS stage_id,     -- ✅ Matches
+    s.stage_name          -- ✅ Matches
+```
+
+#### **2. "structure of query does not match function result type"**
+```
+Error: structure of query does not match function result type
+Location: Any RPC function
+
+Cause: RETURNS TABLE declares different columns than SELECT returns
+
+Solution:
+- Ensure RETURNS TABLE matches SELECT exactly
+- Check column names (exact match required)
+- Check column count (must be equal)
+- Check column order (must match)
+- Example:
+  RETURNS TABLE(
+    stage_id TEXT,    -- Must match SELECT
+    stage_name TEXT   -- Must match SELECT
+  )
+  ...
+  SELECT 
+    s.id AS stage_id,     -- ✅ Matches
+    s.stage_name          -- ✅ Matches
+```
+
+#### **3. "Returned type X does not match expected type Y"**
+```
+Error: Returned type uuid does not match expected type text
+Error: Returned type character varying(100) does not match expected type text
+
+Cause: Database column types don't match function signature
+
+Solution:
+- Cast database types to match function signature
+- Common casts needed:
+  * UUID → TEXT: column_name::TEXT
+  * VARCHAR → TEXT: column_name::TEXT
+  * TIMESTAMP → TEXT: column_name::TEXT
+- Example:
+  RETURNS TABLE(stage_id TEXT)
+  ...
+  SELECT s.id::TEXT AS stage_id  -- ✅ Cast UUID to TEXT
+```
+
+#### **4. Negative Drops or Impossible Conversion Rates**
+```
+Problem: Stage shows -26 dropped leads, or 471% conversion rate
+
+Cause: Counting movements instead of unique lead journeys
+- Leads can move backward (FU 3 → FU 1)
+- Same lead counted multiple times
+
+Solution:
+- Use lead journey analysis with CTEs
+- Track MAX stage reached per lead
+- Count unique leads only
+- Example:
+  WITH lead_max_stage AS (
+    SELECT lead_id, MAX(stage_number) as max_stage_reached
+    FROM lead_stage_history
+    GROUP BY lead_id
+  )
+  SELECT 
+    COUNT(DISTINCT CASE 
+      WHEN max_stage_reached >= current_stage 
+      THEN lead_id 
+    END) as leads_entered
+```
+
+#### **5. "function does not exist"**
+```
+Error: function get_follow_up_funnel_flow() does not exist
+
+Cause: Function not created or was dropped
+
+Solution:
+- Check function exists: SELECT proname FROM pg_proc WHERE proname = 'function_name'
+- Re-run migration SQL to create function
+- Verify function in Supabase Dashboard → Database → Functions
+```
+
+### **Frontend Integration Errors**
+
+#### **6. "Network Error" when calling RPC**
+```
+Error: NetworkError 400/500 when calling supabase.rpc()
+
+Cause: Function returns error or wrong data structure
+
+Solution:
+- Test function directly in Supabase SQL Editor
+- Check browser console for detailed error
+- Verify TypeScript interface matches function output
+- Example:
+  // TypeScript interface must match RETURNS TABLE
+  export interface FunnelFlowStep {
+    stage_id: string;      // Must match function
+    stage_name: string;    // Must match function
+    stage_number: number;  // Must match function
+    ...
+  }
+```
+
+#### **7. "No data shown" in Analytics**
+```
+Problem: Analytics page loads but shows empty state
+
+Cause: No data in database OR RPC function returns empty array
+
+Solution:
+- Check if leads exist: SELECT COUNT(*) FROM leads
+- Check if stage history exists: SELECT COUNT(*) FROM lead_stage_history
+- Test RPC directly: SELECT * FROM get_follow_up_funnel_flow()
+- Verify data flow: Database → RPC → Supabase Client → React Component
+```
+
+### **Performance Issues**
+
+#### **8. Slow RPC Function Execution**
+```
+Problem: Analytics page takes >5 seconds to load
+
+Cause: Complex queries without proper indexes
+
+Solution:
+- Add indexes on frequently queried columns
+- Example:
+  CREATE INDEX idx_lead_history_to_funnel ON lead_stage_history(to_funnel);
+  CREATE INDEX idx_lead_history_to_stage ON lead_stage_history(to_stage_id);
+  CREATE INDEX idx_stages_funnel_number ON stages(funnel_type, stage_number);
+- Monitor query performance in Supabase Dashboard
+```
+
+### **Data Quality Issues**
+
+#### **9. Inconsistent Stage Numbers**
+```
+Problem: Stages numbered 2-8 instead of 1-7
+
+Cause: Initial data seeding used non-sequential numbers
+
+Solution:
+- Not a bug - stage_number is just a sort order
+- RPC functions handle any numbering scheme
+- Use stage_number for ordering, not counting
+```
+
+#### **10. Leads Stuck in Old Stages**
+```
+Problem: Leads showing in deleted stages
+
+Cause: Foreign key references to deleted stages
+
+Solution:
+- Never hard-delete stages - use soft delete (is_active flag)
+- Or update leads before deleting stages:
+  UPDATE leads SET current_stage_id = 'new_stage_id' 
+  WHERE current_stage_id = 'deleted_stage_id'
+```
+
+---
+
+## 📊 Database Maintenance
+
+### **Regular Maintenance Tasks**
+
+```sql
+-- 1. Reindex tables (monthly)
+REINDEX TABLE leads;
+REINDEX TABLE lead_stage_history;
+REINDEX TABLE lead_activities;
+
+-- 2. Analyze tables for query optimization (weekly)
+ANALYZE leads;
+ANALYZE lead_stage_history;
+ANALYZE stages;
+
+-- 3. Check table sizes
+SELECT 
+  schemaname,
+  tablename,
+  pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+-- 4. Find slow queries (check execution time > 1s)
+SELECT 
+  query,
+  calls,
+  total_time,
+  mean_time
+FROM pg_stat_statements
+WHERE mean_time > 1000
+ORDER BY mean_time DESC
+LIMIT 10;
+```
+
+---
+
 ## 📝 Changelog
 
 ### **Version 1.0.0 (January 9, 2026)**
@@ -1250,6 +1660,45 @@ Future Enhancements:
 - ✅ Daily movement trends
 - ✅ Source performance analytics
 - ✅ Monthly trend analysis
+
+### **Version 1.1.0 (January 9, 2026)** ✨ NEW
+- ✅ **NEW FEATURE**: Follow-Up Funnel Flow visualization
+  - Complete funnel metrics (entered, progressed, dropped)
+  - Visual drop rate indicators
+  - Conversion rate per stage
+  - Identifies bottleneck stages automatically
+
+- ✅ **NEW ANALYTICS**: Enhanced Analytics Report Page
+  - Funnel Leakage Stats (Follow-Up → Broadcast tracking)
+  - Stage Velocity metrics (average time per stage)
+  - Heatmap Analytics (best times for sales activities)
+  - Bottleneck Warnings with severity levels
+
+- 🔧 **FIXES**: Database Function Improvements
+  - Fixed ambiguous column references in all RPC functions
+  - Fixed query structure mismatches (RETURNS TABLE alignment)
+  - Fixed type mismatches (UUID/VARCHAR → TEXT casting)
+  - Fixed negative drops and impossible conversion rates
+  - Implemented proper lead journey analysis
+
+- 📚 **DOCUMENTATION**: Complete troubleshooting guide added
+  - Common error patterns and solutions
+  - RPC function debugging steps
+  - Performance optimization tips
+  - Data quality maintenance procedures
+
+- 🎨 **UI IMPROVEMENTS**: Analytics Report Page
+  - Clean, modern design with card-based layout
+  - Color-coded metrics (green/yellow/red severity)
+  - Responsive grid system
+  - Improved empty states
+  - Better spacing and typography
+
+- ⚡ **PERFORMANCE**: Query Optimization
+  - Efficient lead journey tracking with CTEs
+  - Proper indexing recommendations
+  - Reduced redundant queries
+  - Faster analytics loading times
 
 ---
 

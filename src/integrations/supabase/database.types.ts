@@ -374,6 +374,7 @@ export type Database = {
         Returns: {
           conversion_rate: number
           drop_rate: number
+          funnel_type: string
           leads_dropped: number
           leads_entered: number
           leads_progressed: number
