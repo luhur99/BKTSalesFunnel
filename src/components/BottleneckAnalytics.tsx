@@ -102,7 +102,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
     try {
       setLoading(true);
       const data = await db.analytics.getBottleneckAnalytics();
-      setAnalytics(data);
+      setAnalytics(Array.isArray(data) ? data : []);
       
       // Load source breakdown and conversion
       await loadSourceBreakdown();
@@ -115,6 +115,12 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       await loadLeadsList();
     } catch (error) {
       console.error("Error loading analytics:", error);
+      // Set empty arrays on error to prevent crashes
+      setAnalytics([]);
+      setSourceBreakdown([]);
+      setSourceConversion([]);
+      setDailyMovements([]);
+      setAllLeads([]);
     } finally {
       setLoading(false);
     }
@@ -128,9 +134,10 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       startDate.setDate(startDate.getDate() - 7);
       
       const movements = await db.analytics.getDailyStageMovements(startDate, endDate);
-      setDailyMovements(movements);
+      setDailyMovements(Array.isArray(movements) ? movements : []);
     } catch (error) {
       console.error("Error loading daily movements:", error);
+      setDailyMovements([]);
     }
   };
 
@@ -138,7 +145,8 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
   const loadLeadsList = async () => {
     try {
       const leads = await db.leads.getAll();
-      const leadsWithNames = leads.map(lead => ({
+      const leadsArray = Array.isArray(leads) ? leads : [];
+      const leadsWithNames = leadsArray.map(lead => ({
         id: lead.id,
         name: lead.name || lead.phone || lead.email || "Unknown Lead",
         phone: lead.phone || ""
@@ -152,6 +160,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       }
     } catch (error) {
       console.error("Error loading leads list:", error);
+      setAllLeads([]);
     }
   };
 
@@ -179,22 +188,23 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
   const loadSourceBreakdown = async () => {
     try {
       const leads = await db.leads.getAll();
+      const leadsArray = Array.isArray(leads) ? leads : [];
       
       // Debug logging
-      console.log("🔍 DEBUG: Total leads fetched:", leads.length);
-      if (leads.length > 0) {
-        console.log("🔍 DEBUG: Sample lead structure:", leads[0]);
-        console.log("🔍 DEBUG: Lead[0] source object:", leads[0].source);
-        console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
+      console.log("🔍 DEBUG: Total leads fetched:", leadsArray.length);
+      if (leadsArray.length > 0) {
+        console.log("🔍 DEBUG: Sample lead structure:", leadsArray[0]);
+        console.log("🔍 DEBUG: Lead[0] source object:", leadsArray[0].source);
+        console.log("🔍 DEBUG: Lead[0] source.name:", leadsArray[0].source?.name);
       }
       
       const sourceMap = new Map<string, number>();
-      leads.forEach(lead => {
+      leadsArray.forEach(lead => {
         const sourceName = lead.source?.name || "Unknown";
         sourceMap.set(sourceName, (sourceMap.get(sourceName) || 0) + 1);
       });
       
-      const total = leads.length;
+      const total = leadsArray.length;
       const breakdown: SourceBreakdown[] = Array.from(sourceMap.entries()).map(([source, count]) => ({
         source,
         count,
@@ -206,23 +216,25 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       setSourceBreakdown(breakdown);
     } catch (error) {
       console.error("Error loading source breakdown:", error);
+      setSourceBreakdown([]);
     }
   };
 
   const loadSourceConversion = async () => {
     try {
       const leads = await db.leads.getAll();
+      const leadsArray = Array.isArray(leads) ? leads : [];
       
       // Debug logging
-      console.log("🔍 DEBUG: Total leads fetched:", leads.length);
-      if (leads.length > 0) {
-        console.log("🔍 DEBUG: Sample lead structure:", leads[0]);
-        console.log("🔍 DEBUG: Lead[0] source object:", leads[0].source);
-        console.log("🔍 DEBUG: Lead[0] source.name:", leads[0].source?.name);
+      console.log("🔍 DEBUG: Total leads fetched:", leadsArray.length);
+      if (leadsArray.length > 0) {
+        console.log("🔍 DEBUG: Sample lead structure:", leadsArray[0]);
+        console.log("🔍 DEBUG: Lead[0] source object:", leadsArray[0].source);
+        console.log("🔍 DEBUG: Lead[0] source.name:", leadsArray[0].source?.name);
       }
       
       // 🔍 DEBUG: Log all lead statuses to check format
-      console.log("🔍 DEBUG: All lead statuses:", leads.map(l => ({ 
+      console.log("🔍 DEBUG: All lead statuses:", leadsArray.map(l => ({ 
         id: l.id, 
         name: l.name, 
         status: l.status,
@@ -232,7 +244,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       })));
       
       const sourceMap = new Map<string, { total: number; deals: number }>();
-      leads.forEach(lead => {
+      leadsArray.forEach(lead => {
         const sourceName = lead.source?.name || "Unknown";
         
         // 🔧 FIX: Case-insensitive status check with trim
@@ -278,12 +290,14 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       setSourceConversion(conversions);
     } catch (error) {
       console.error("Error loading source conversion:", error);
+      setSourceConversion([]);
     }
   };
 
   const loadMonthlyDayAnalytics = async () => {
     try {
       const leads = await db.leads.getAll();
+      const leadsArray = Array.isArray(leads) ? leads : [];
       
       const now = new Date();
       const currentMonth = now.getMonth();
@@ -296,8 +310,8 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       };
 
       // Filter leads for current month
-      const monthLeads = leads.filter(l => isCurrentMonth(l.created_at));
-      const monthDeals = leads.filter(l => 
+      const monthLeads = leadsArray.filter(l => isCurrentMonth(l.created_at));
+      const monthDeals = leadsArray.filter(l => 
         l.status?.trim().toLowerCase() === "deal" && 
         isCurrentMonth(l.updated_at)
       );
@@ -335,11 +349,12 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       
       // 5. Monthly Stage Distribution (Where are this month's leads now?)
       const stages = await db.stages.getAll();
+      const stagesArray = Array.isArray(stages) ? stages : [];
       const stageDistribution: { stage: string; count: number }[] = [];
       
       // Group by funnel type and stage number
-      const followUpStages = stages.filter(s => s.funnel_type === "follow_up").sort((a, b) => a.stage_number - b.stage_number);
-      const broadcastStages = stages.filter(s => s.funnel_type === "broadcast").sort((a, b) => a.stage_number - b.stage_number);
+      const followUpStages = stagesArray.filter(s => s.funnel_type === "follow_up").sort((a, b) => a.stage_number - b.stage_number);
+      const broadcastStages = stagesArray.filter(s => s.funnel_type === "broadcast").sort((a, b) => a.stage_number - b.stage_number);
       
       // Check distribution of monthLeads
       followUpStages.forEach(stage => {
@@ -382,12 +397,14 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       });
     } catch (error) {
       console.error("Error loading monthly day analytics:", error);
+      setMonthlyDayAnalytics(null);
     }
   };
 
   const loadMonthlyAnalytics = async () => {
     try {
       const leads = await db.leads.getAll();
+      const leadsArray = Array.isArray(leads) ? leads : [];
       
       const now = new Date();
       const currentMonth = now.getMonth();
@@ -404,15 +421,15 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       };
 
       // 1. Filter Leads & Deals for Current Month
-      const thisMonthLeads = leads.filter(l => isInMonth(l.created_at, currentMonth, currentYear));
-      const thisMonthDeals = leads.filter(l => 
+      const thisMonthLeads = leadsArray.filter(l => isInMonth(l.created_at, currentMonth, currentYear));
+      const thisMonthDeals = leadsArray.filter(l => 
         l.status?.trim().toLowerCase() === "deal" && 
         isInMonth(l.updated_at, currentMonth, currentYear)
       );
 
       // 2. Filter Leads & Deals for Last Month
-      const lastMonthLeadsData = leads.filter(l => isInMonth(l.created_at, lastMonth, lastMonthYear));
-      const lastMonthDealsData = leads.filter(l => 
+      const lastMonthLeadsData = leadsArray.filter(l => isInMonth(l.created_at, lastMonth, lastMonthYear));
+      const lastMonthDealsData = leadsArray.filter(l => 
         l.status?.trim().toLowerCase() === "deal" && 
         isInMonth(l.updated_at, lastMonth, lastMonthYear)
       );
@@ -485,6 +502,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
 
     } catch (error) {
       console.error("Error loading monthly analytics:", error);
+      setMonthlyAnalytics(null);
     }
   };
 
@@ -1154,15 +1172,15 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
                         
                         <div className="grid grid-cols-3 gap-4 mt-3">
                           <div>
-                            <p className="text-xs text-slate-500 mb-1">Leads Masuk</p>
+                            <p className="text-xs text-slate-600 mb-1">Leads Masuk</p>
                             <p className="text-lg font-bold text-slate-900">{stage.leads_entered}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500 mb-1">Progressed</p>
+                            <p className="text-xs text-slate-600 mb-1">Progressed</p>
                             <p className="text-lg font-bold text-green-600">{stage.leads_progressed}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-500 mb-1">Stuck</p>
+                            <p className="text-xs text-slate-600 mb-1">Stuck</p>
                             <p className="text-lg font-bold text-red-600">{stage.leads_stuck}</p>
                           </div>
                         </div>
@@ -1203,22 +1221,35 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
           <CardContent>
             <div className="space-y-3">
               {topPerformers.map((stage) => (
-                <div key={stage.stage_id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div key={stage.stage_id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">{stage.stage_name}</p>
+                        <p className="text-sm text-slate-500">
+                          {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} Stage {stage.stage_number}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-900">{stage.stage_name}</p>
-                      <p className="text-sm text-slate-500">
-                        {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} Stage {stage.stage_number}
-                      </p>
+                    <div className="flex items-center gap-6 text-sm">
+                      <span className="text-slate-600">
+                        <strong className="text-slate-900">{stage.leads_entered}</strong> masuk
+                      </span>
+                      <span className="text-green-600">
+                        <strong>{stage.leads_progressed}</strong> lanjut
+                      </span>
+                      <span className="text-red-600">
+                        <strong>{stage.leads_stuck}</strong> stuck
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600">{stage.conversion_rate.toFixed(1)}%</p>
-                    <p className="text-xs text-slate-500">{stage.leads_progressed}/{stage.leads_entered} progressed</p>
-                  </div>
+                  <Badge className={`${getConversionColor(stage.conversion_rate)} border`}>
+                    <Icon className="w-3 h-3 mr-1" />
+                    {stage.conversion_rate.toFixed(1)}%
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -1246,7 +1277,9 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
                 <div key={stage.stage_id} className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h4 className="font-semibold text-slate-900">{stage.stage_name}</h4>
+                      <h4 className="font-semibold text-slate-900">
+                        {stage.stage_name}
+                      </h4>
                       <Badge className="text-xs bg-slate-100 text-slate-700">
                         {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} #{stage.stage_number}
                       </Badge>
