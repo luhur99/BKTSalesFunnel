@@ -90,9 +90,9 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       const sourcesData = await db.sources.getAll();
       setSources(sourcesData);
       
-      // Load ONLY Follow Up stages
-      const followUpStages = await db.stages.getByFunnel("follow_up");
-      const sortedStages = followUpStages.sort((a, b) => a.stage_number - b.stage_number);
+      // Load ALL stages (both Follow Up and Broadcast funnels)
+      const allStages = await db.stages.getAll();
+      const sortedStages = allStages.sort((a, b) => a.stage_number - b.stage_number);
       setStages(sortedStages);
       
       // Load available labels
