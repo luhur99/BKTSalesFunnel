@@ -34,6 +34,17 @@ export interface AnalyticsSummary {
   bottleneckWarnings: BottleneckWarning[];
 }
 
+export interface FunnelFlowStep {
+  stage_id: string;
+  stage_name: string;
+  stage_number: number;
+  leads_entered: number;
+  leads_progressed: number;
+  leads_dropped: number;
+  drop_rate: number;
+  conversion_rate: number;
+}
+
 // Chart Data Types (for Recharts)
 export interface VelocityChartData {
   stage: string;

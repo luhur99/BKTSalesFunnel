@@ -369,6 +369,19 @@ export type Database = {
           total_movements: number
         }[]
       }
+      get_follow_up_funnel_flow: {
+        Args: never
+        Returns: {
+          conversion_rate: number
+          drop_rate: number
+          leads_dropped: number
+          leads_entered: number
+          leads_progressed: number
+          stage_id: string
+          stage_name: string
+          stage_number: number
+        }[]
+      }
       get_funnel_leakage_stats: {
         Args: never
         Returns: {

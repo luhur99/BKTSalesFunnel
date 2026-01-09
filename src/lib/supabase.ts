@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Lead, LeadSource, Stage, LeadActivity, LeadStageHistory, StageScript, BottleneckAnalytics, FunnelType } from "@/types/lead";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning } from "@/types/analytics";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep } from "@/types/analytics";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
@@ -869,6 +869,31 @@ export const db = {
           };
         })
         .sort((a, b) => b.avg_hours - a.avg_hours);
+    },
+
+    // NEW: Follow-Up Funnel Flow
+    getFollowUpFunnelFlow: async (): Promise<FunnelFlowStep[]> => {
+      if (!isConnected) {
+        // Mock data for offline mode
+        return [
+          { stage_id: "stage-fu-1", stage_name: "New Lead", stage_number: 1, leads_entered: 100, leads_progressed: 85, leads_dropped: 15, drop_rate: 15, conversion_rate: 85 },
+          { stage_id: "stage-fu-2", stage_name: "Contacted", stage_number: 2, leads_entered: 85, leads_progressed: 68, leads_dropped: 17, drop_rate: 20, conversion_rate: 80 },
+          { stage_id: "stage-fu-3", stage_name: "Interest", stage_number: 3, leads_entered: 68, leads_progressed: 54, leads_dropped: 14, drop_rate: 20.6, conversion_rate: 79.4 },
+          { stage_id: "stage-fu-4", stage_name: "Negotiation", stage_number: 4, leads_entered: 54, leads_progressed: 43, leads_dropped: 11, drop_rate: 20.4, conversion_rate: 79.6 },
+          { stage_id: "stage-fu-5", stage_name: "Closing", stage_number: 5, leads_entered: 43, leads_progressed: 35, leads_dropped: 8, drop_rate: 18.6, conversion_rate: 81.4 },
+          { stage_id: "stage-fu-6", stage_name: "Follow Up 6", stage_number: 6, leads_entered: 35, leads_progressed: 28, leads_dropped: 7, drop_rate: 20, conversion_rate: 80 },
+          { stage_id: "stage-fu-7", stage_name: "Follow Up 7", stage_number: 7, leads_entered: 28, leads_progressed: 23, leads_dropped: 5, drop_rate: 17.9, conversion_rate: 82.1 },
+          { stage_id: "stage-fu-8", stage_name: "Follow Up 8", stage_number: 8, leads_entered: 23, leads_progressed: 19, leads_dropped: 4, drop_rate: 17.4, conversion_rate: 82.6 },
+          { stage_id: "stage-fu-9", stage_name: "Follow Up 9", stage_number: 9, leads_entered: 19, leads_progressed: 16, leads_dropped: 3, drop_rate: 15.8, conversion_rate: 84.2 },
+          { stage_id: "stage-fu-10", stage_name: "Follow Up 10", stage_number: 10, leads_entered: 16, leads_progressed: 14, leads_dropped: 2, drop_rate: 12.5, conversion_rate: 87.5 },
+        ];
+      }
+      const { data, error } = await supabase.rpc("get_follow_up_funnel_flow");
+      if (error) {
+        console.error("Error fetching follow-up funnel flow:", error);
+        return [];
+      }
+      return data || [];
     }
   },
 

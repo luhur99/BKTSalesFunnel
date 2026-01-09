@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
 
 export default function AnalyticsReportPage() {
   const router = useRouter();
