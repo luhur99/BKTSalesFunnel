@@ -7,12 +7,13 @@ import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { FunnelHealthCards } from "@/components/analytics/FunnelHealthCards";
 import { BottleneckWarnings } from "@/components/analytics/BottleneckWarnings";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
+import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
+import { Separator } from "@/components/ui/separator";
+import { AlertCircle, TrendingUp } from "lucide-react";
 
 export default function AnalyticsReportPage() {
   const router = useRouter();
@@ -106,15 +107,16 @@ export default function AnalyticsReportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
         <div className="max-w-7xl mx-auto">
-          <Skeleton className="h-20 w-full mb-8" />
+          <Skeleton className="h-24 w-full mb-8 rounded-xl" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
-            <Skeleton className="h-32" />
+            <Skeleton className="h-36 rounded-xl" />
+            <Skeleton className="h-36 rounded-xl" />
+            <Skeleton className="h-36 rounded-xl" />
           </div>
-          <Skeleton className="h-96 w-full" />
+          <Skeleton className="h-96 w-full mb-8 rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       </div>
     );
@@ -122,7 +124,7 @@ export default function AnalyticsReportPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
         <div className="max-w-7xl mx-auto">
           <Alert variant="destructive" className="mb-8">
             <AlertCircle className="h-4 w-4" />
@@ -130,7 +132,7 @@ export default function AnalyticsReportPage() {
           </Alert>
           <button
             onClick={() => router.push("/dashboard")}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
           >
             ← Back to Dashboard
           </button>
@@ -139,93 +141,149 @@ export default function AnalyticsReportPage() {
     );
   }
 
+  // Default leakage stats if not available
+  const displayLeakageStats = leakageStats || {
+    total_leads: 0,
+    leaked_to_broadcast: 0,
+    leakage_percentage: 0
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
         {/* Header */}
         <AnalyticsHeader />
 
         {/* Funnel Health Cards */}
-        {leakageStats && (
-          <div className="mb-8">
-            <FunnelHealthCards leakageStats={leakageStats} />
+        <section>
+          <FunnelHealthCards leakageStats={displayLeakageStats} />
+        </section>
+
+        <Separator className="my-8" />
+
+        {/* Follow-Up Funnel Flow - FEATURED SECTION */}
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Follow-Up Funnel Flow</h2>
+              <p className="text-sm text-gray-600">Visualisasi perjalanan lead dari masuk hingga closing</p>
+            </div>
           </div>
-        )}
+          <FollowUpFunnelFlow />
+        </section>
+
+        <Separator className="my-8" />
 
         {/* Bottleneck Warnings */}
         {bottleneckWarnings.length > 0 && (
-          <div className="mb-8">
-            <Card>
+          <section>
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50/50 to-orange-50/50 backdrop-blur shadow-lg">
               <CardHeader>
-                <CardTitle>⚠️ Bottleneck Alerts</CardTitle>
-                <CardDescription>Stages requiring attention</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-amber-900">
+                  <AlertCircle className="w-5 h-5" />
+                  Bottleneck Alerts
+                </CardTitle>
+                <CardDescription>Stages requiring immediate attention</CardDescription>
               </CardHeader>
               <CardContent>
                 <BottleneckWarnings warnings={bottleneckWarnings} />
               </CardContent>
             </Card>
-          </div>
+          </section>
         )}
 
-        {/* Tabs for Different Analytics Views */}
-        <Tabs defaultValue="velocity" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="velocity">Stage Velocity</TabsTrigger>
-            <TabsTrigger value="heatmap">Lead Entry Patterns</TabsTrigger>
-          </TabsList>
+        {bottleneckWarnings.length > 0 && <Separator className="my-8" />}
 
-          {/* Stage Velocity Tab */}
-          <TabsContent value="velocity">
-            <Card>
-              <CardHeader>
-                <CardTitle>📊 Stage Velocity Analysis</CardTitle>
-                <CardDescription>
-                  Average time leads spend in each stage and total leads processed
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {velocityChartData.length > 0 ? (
-                  <VelocityChart data={velocityChartData} />
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    No velocity data available yet. Add some leads to see analytics.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Detailed Analytics Tabs */}
+        <section>
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Detailed Analytics</h2>
+            <p className="text-sm text-gray-600">Deep dive into stage performance and lead patterns</p>
+          </div>
 
-          {/* Heatmap Tab */}
-          <TabsContent value="heatmap">
-            <Card>
-              <CardHeader>
-                <CardTitle>🔥 Lead Entry Heatmap</CardTitle>
-                <CardDescription>
-                  Identify peak times when leads enter your funnel
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {heatmapCells.length > 0 ? (
-                  <HeatmapGrid data={heatmapCells} />
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    No heatmap data available yet. Add some leads to see patterns.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          <Tabs defaultValue="velocity" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/80 backdrop-blur border border-slate-200 p-1 rounded-xl shadow-sm">
+              <TabsTrigger 
+                value="velocity"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white rounded-lg transition-all"
+              >
+                📊 Stage Velocity
+              </TabsTrigger>
+              <TabsTrigger 
+                value="heatmap"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white rounded-lg transition-all"
+              >
+                🔥 Lead Entry Patterns
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Stage Velocity Tab */}
+            <TabsContent value="velocity">
+              <Card className="border-slate-200 bg-white/80 backdrop-blur shadow-lg">
+                <CardHeader>
+                  <CardTitle>📊 Stage Velocity Analysis</CardTitle>
+                  <CardDescription>
+                    Average time leads spend in each stage and total leads processed
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {velocityChartData.length > 0 ? (
+                    <VelocityChart data={velocityChartData} />
+                  ) : (
+                    <div className="text-center py-16">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
+                        <TrendingUp className="w-8 h-8 text-slate-400" />
+                      </div>
+                      <p className="text-slate-600 font-medium mb-2">No velocity data available yet</p>
+                      <p className="text-sm text-slate-500">Add some leads and move them through stages to see analytics</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Heatmap Tab */}
+            <TabsContent value="heatmap">
+              <Card className="border-slate-200 bg-white/80 backdrop-blur shadow-lg">
+                <CardHeader>
+                  <CardTitle>🔥 Lead Entry Heatmap</CardTitle>
+                  <CardDescription>
+                    Identify peak times when leads enter your funnel
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {heatmapCells.length > 0 ? (
+                    <HeatmapGrid data={heatmapCells} />
+                  ) : (
+                    <div className="text-center py-16">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
+                        <TrendingUp className="w-8 h-8 text-slate-400" />
+                      </div>
+                      <p className="text-slate-600 font-medium mb-2">No heatmap data available yet</p>
+                      <p className="text-sm text-slate-500">Add some leads to see entry patterns</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </section>
+
+        <Separator className="my-8" />
 
         {/* Back to Dashboard Button */}
-        <div className="mt-8 text-center">
+        <section className="text-center pb-8">
           <button
             onClick={() => router.push("/dashboard")}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
           >
             ← Back to Dashboard
           </button>
-        </div>
+        </section>
       </div>
     </div>
   );
