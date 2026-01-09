@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -334,6 +334,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_avg_time_per_stage: {
+        Args: never
+        Returns: {
+          avg_hours: number
+          stage_name_out: string
+          total_leads_passed: number
+        }[]
+      }
       get_bottleneck_analytics: {
         Args: never
         Returns: {
@@ -359,6 +367,22 @@ export type Database = {
           to_funnel: Database["public"]["Enums"]["funnel_type"]
           to_stage_name: string
           total_movements: number
+        }[]
+      }
+      get_funnel_leakage_stats: {
+        Args: never
+        Returns: {
+          leakage_percentage: number
+          leaked_to_broadcast: number
+          total_leads: number
+        }[]
+      }
+      get_heatmap_analytics: {
+        Args: { target_type: string }
+        Returns: {
+          count: number
+          day_name: string
+          hour_of_day: number
         }[]
       }
       get_lead_journey_analytics: {
