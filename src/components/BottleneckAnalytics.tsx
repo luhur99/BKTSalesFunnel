@@ -1220,38 +1220,43 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {topPerformers.map((stage) => (
-                <div key={stage.stage_id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+              {topPerformers.map((stage) => {
+                const badge = getConversionBadge(stage.conversion_rate);
+                const Icon = badge.icon;
+                
+                return (
+                  <div key={stage.stage_id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{stage.stage_name}</p>
+                          <p className="text-sm text-slate-500">
+                            {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} Stage {stage.stage_number}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-slate-900">{stage.stage_name}</p>
-                        <p className="text-sm text-slate-500">
-                          {stage.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"} Stage {stage.stage_number}
-                        </p>
+                      <div className="flex items-center gap-6 text-sm">
+                        <span className="text-slate-600">
+                          <strong className="text-slate-900">{stage.leads_entered}</strong> masuk
+                        </span>
+                        <span className="text-green-600">
+                          <strong>{stage.leads_progressed}</strong> lanjut
+                        </span>
+                        <span className="text-red-600">
+                          <strong>{stage.leads_stuck}</strong> stuck
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-6 text-sm">
-                      <span className="text-slate-600">
-                        <strong className="text-slate-900">{stage.leads_entered}</strong> masuk
-                      </span>
-                      <span className="text-green-600">
-                        <strong>{stage.leads_progressed}</strong> lanjut
-                      </span>
-                      <span className="text-red-600">
-                        <strong>{stage.leads_stuck}</strong> stuck
-                      </span>
-                    </div>
+                    <Badge className={`${getConversionColor(stage.conversion_rate)} border`}>
+                      <Icon className="w-3 h-3 mr-1" />
+                      {stage.conversion_rate.toFixed(1)}%
+                    </Badge>
                   </div>
-                  <Badge className={`${getConversionColor(stage.conversion_rate)} border`}>
-                    <Icon className="w-3 h-3 mr-1" />
-                    {stage.conversion_rate.toFixed(1)}%
-                  </Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
