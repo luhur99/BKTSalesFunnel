@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook, Globe, Share2, UserPlus, Target, Calendar, BarChart3, Award } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface BottleneckAnalyticsProps {
   key?: string;
@@ -33,6 +34,36 @@ interface MonthlyDayAnalytics {
   dealsPerDay: { day: string; count: number }[];
 }
 
+interface DailyMovement {
+  movement_date: string;
+  from_stage_name: string;
+  to_stage_name: string;
+  from_funnel: string;
+  to_funnel: string;
+  is_funnel_switch: boolean;
+  total_movements: number;
+  movement_reasons: Record<string, number>;
+}
+
+interface LeadJourney {
+  lead_id: string;
+  lead_name: string | null;
+  total_journey_days: string;
+  current_status: string;
+  current_funnel: string;
+  current_stage_name: string;
+  stages_history: {
+    stage_name: string;
+    stage_number: number;
+    funnel_type: string;
+    entered_at: string;
+    exited_at: string;
+    days_in_stage: number;
+    reason: string;
+    notes?: string;
+  }[];
+}
+
 interface MonthlyAnalytics {
   weeklyDeals: { week: number; count: number }[];
   weeklyLeads: { week: number; count: number }[];
@@ -55,6 +86,13 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
   const [sourceConversion, setSourceConversion] = useState<SourceConversion[]>([]);
   const [monthlyDayAnalytics, setMonthlyDayAnalytics] = useState<MonthlyDayAnalytics | null>(null);
   const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlyAnalytics | null>(null);
+  
+  // NEW: Daily movements and lead journey state
+  const [dailyMovements, setDailyMovements] = useState<DailyMovement[]>([]);
+  const [allLeads, setAllLeads] = useState<{ id: string; name: string; phone: string }[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string>("");
+  const [leadJourney, setLeadJourney] = useState<LeadJourney | null>(null);
+  const [journeyLoading, setJourneyLoading] = useState(false);
 
   useEffect(() => {
     loadAnalytics();
@@ -71,11 +109,71 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       await loadSourceConversion();
       await loadMonthlyDayAnalytics();
       await loadMonthlyAnalytics();
+      
+      // NEW: Load daily movements and leads list
+      await loadDailyMovements();
+      await loadLeadsList();
     } catch (error) {
       console.error("Error loading analytics:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // NEW: Load daily movements for last 7 days
+  const loadDailyMovements = async () => {
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      
+      const movements = await db.analytics.getDailyStageMovements(startDate, endDate);
+      setDailyMovements(movements);
+    } catch (error) {
+      console.error("Error loading daily movements:", error);
+    }
+  };
+
+  // NEW: Load all leads for journey viewer dropdown
+  const loadLeadsList = async () => {
+    try {
+      const leads = await db.leads.getAll();
+      const leadsWithNames = leads.map(lead => ({
+        id: lead.id,
+        name: lead.name || lead.phone || lead.email || "Unknown Lead",
+        phone: lead.phone || ""
+      }));
+      setAllLeads(leadsWithNames);
+      
+      // Auto-select first lead if available
+      if (leadsWithNames.length > 0) {
+        setSelectedLeadId(leadsWithNames[0].id);
+        await loadLeadJourney(leadsWithNames[0].id);
+      }
+    } catch (error) {
+      console.error("Error loading leads list:", error);
+    }
+  };
+
+  // NEW: Load journey for selected lead
+  const loadLeadJourney = async (leadId: string) => {
+    if (!leadId) return;
+    
+    try {
+      setJourneyLoading(true);
+      const journey = await db.analytics.getLeadJourneyAnalytics(leadId);
+      setLeadJourney(journey);
+    } catch (error) {
+      console.error("Error loading lead journey:", error);
+    } finally {
+      setJourneyLoading(false);
+    }
+  };
+
+  // NEW: Handle lead selection change
+  const handleLeadSelect = async (leadId: string) => {
+    setSelectedLeadId(leadId);
+    await loadLeadJourney(leadId);
   };
 
   const loadSourceBreakdown = async () => {
@@ -471,6 +569,180 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
 
   return (
     <div className="space-y-6">
+      {/* NEW: Daily Movement Trends Card */}
+      <Card className="border-slate-200 bg-white">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-indigo-600" />
+            </div>
+            Daily Movement Trends (Last 7 Days)
+          </CardTitle>
+          <CardDescription className="text-xs">Track daily lead movements and funnel switches</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {dailyMovements.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">No movements in last 7 days</p>
+          ) : (
+            <>
+              {/* Movement Activity Summary */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-xs text-slate-600 mb-1">Total Movements</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {dailyMovements.reduce((sum, m) => sum + m.total_movements, 0)}
+                  </p>
+                </div>
+                <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                  <p className="text-xs text-slate-600 mb-1">Funnel Switches</p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {dailyMovements.filter(m => m.is_funnel_switch).reduce((sum, m) => sum + m.total_movements, 0)}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                  <p className="text-xs text-slate-600 mb-1">Active Days</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {new Set(dailyMovements.map(m => m.movement_date)).size}
+                  </p>
+                </div>
+              </div>
+
+              {/* Top 5 Movement Patterns */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-600">Top Movement Patterns</p>
+                {dailyMovements
+                  .sort((a, b) => b.total_movements - a.total_movements)
+                  .slice(0, 5)
+                  .map((movement, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-medium text-slate-700">
+                            {movement.from_stage_name} → {movement.to_stage_name}
+                          </span>
+                          {movement.is_funnel_switch && (
+                            <Badge className="text-xs bg-orange-100 text-orange-700 border-orange-200">
+                              Funnel Switch
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {new Date(movement.movement_date).toLocaleDateString("id-ID", { 
+                            day: "numeric", 
+                            month: "short" 
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-slate-900">{movement.total_movements}</p>
+                        <p className="text-xs text-slate-500">moves</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* NEW: Lead Journey Viewer Card */}
+      <Card className="border-slate-200 bg-white">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Target className="w-4 h-4 text-purple-600" />
+            </div>
+            Lead Journey Timeline
+          </CardTitle>
+          <CardDescription className="text-xs">View complete journey for any lead</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Lead Selector */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-600">Select Lead:</label>
+            <Select value={selectedLeadId} onValueChange={handleLeadSelect}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose a lead..." />
+              </SelectTrigger>
+              <SelectContent>
+                {allLeads.map((lead) => (
+                  <SelectItem key={lead.id} value={lead.id}>
+                    {lead.name} {lead.phone && `(${lead.phone})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Journey Display */}
+          {journeyLoading ? (
+            <div className="text-center py-4">
+              <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            </div>
+          ) : leadJourney ? (
+            <>
+              {/* Journey Summary */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                  <p className="text-xs text-slate-600 mb-1">Total Days</p>
+                  <p className="text-xl font-bold text-purple-900">
+                    {parseFloat(leadJourney.total_journey_days).toFixed(1)}
+                  </p>
+                </div>
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p className="text-xs text-slate-600 mb-1">Current Funnel</p>
+                  <p className="text-sm font-semibold text-blue-900">
+                    {leadJourney.current_funnel === "follow_up" ? "Follow Up" : "Broadcast"}
+                  </p>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                  <p className="text-xs text-slate-600 mb-1">Status</p>
+                  <p className="text-sm font-semibold text-green-900 capitalize">
+                    {leadJourney.current_status}
+                  </p>
+                </div>
+              </div>
+
+              {/* Stage Timeline */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-600">Stage History:</p>
+                {leadJourney.stages_history.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">
+                    No stage movements yet (still in initial stage)
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {leadJourney.stages_history.map((stage, index) => (
+                      <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                        <div className="w-8 h-8 bg-white rounded-full border-2 border-purple-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-purple-600">{index + 1}</span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold text-slate-900">{stage.stage_name}</p>
+                            <Badge className="text-xs bg-slate-100 text-slate-700">
+                              {stage.funnel_type === "follow_up" ? "FU" : "BC"}-{stage.stage_number}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-600">
+                            {stage.days_in_stage.toFixed(2)} days • {stage.reason}
+                          </p>
+                          {stage.notes && (
+                            <p className="text-xs text-slate-500 mt-1 italic">{stage.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500 text-center py-4">Select a lead to view journey</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Overall Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Source Breakdown Card */}
@@ -677,7 +949,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
                     <p className="text-xs font-medium text-slate-600">📈 Trend Deals Mingguan</p>
                     <span className="text-xs text-slate-500">{monthlyAnalytics.month}</span>
                   </div>
-                  <div className="space-y-2 bg-slate-50 p-3 rounded-lg">
+                  <div className="space-y-2 bg-slate-50 p-3 rounded-lg border border-blue-200">
                     {monthlyAnalytics.weeklyDeals.length === 0 ? (
                       <p className="text-xs text-slate-500 text-center">Belum ada deals bulan ini</p>
                     ) : (
@@ -700,7 +972,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
                             </div>
                           );
                         })}
-                        <div className="pt-2 mt-2 border-t border-slate-300">
+                        <div className="pt-2 mt-2 border-t border-blue-300">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold text-slate-700">Total Deals:</span>
                             <span className="font-bold text-green-600">{monthlyAnalytics.monthlyDeals}</span>

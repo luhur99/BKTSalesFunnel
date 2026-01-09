@@ -706,6 +706,83 @@ export const db = {
       const { data, error } = await supabase.rpc("get_bottleneck_analytics");
       if (error) throw error;
       return data;
+    },
+
+    getDailyStageMovements: async (startDate?: Date, endDate?: Date) => {
+      if (!isConnected) {
+        // Mock data for daily movements
+        const mockMovements = [];
+        const today = new Date();
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(today);
+          date.setDate(date.getDate() - i);
+          mockMovements.push({
+            movement_date: date.toISOString().split('T')[0],
+            from_stage_name: "FU 1",
+            to_stage_name: "FU 2",
+            from_funnel: "follow_up",
+            to_funnel: "follow_up",
+            is_funnel_switch: false,
+            total_movements: Math.floor(Math.random() * 15) + 5,
+            movement_reasons: { progression: Math.floor(Math.random() * 10) + 5 }
+          });
+        }
+        return mockMovements;
+      }
+
+      const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate || new Date();
+      
+      const { data, error } = await supabase.rpc("get_daily_stage_movements", {
+        start_date: start.toISOString().split('T')[0],
+        end_date: end.toISOString().split('T')[0]
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+
+    getLeadJourneyAnalytics: async (leadId: string) => {
+      if (!isConnected) {
+        // Mock journey data
+        return {
+          lead_id: leadId,
+          lead_name: "Mock Lead",
+          total_journey_days: "5.5",
+          current_status: "active",
+          current_funnel: "follow_up",
+          current_stage_name: "FU 2",
+          stages_history: [
+            {
+              stage_name: "FU 1",
+              stage_number: 1,
+              funnel_type: "follow_up",
+              entered_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+              exited_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              days_in_stage: 2,
+              reason: "progression",
+              notes: "Lead responded positively"
+            },
+            {
+              stage_name: "FU 2",
+              stage_number: 2,
+              funnel_type: "follow_up",
+              entered_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+              exited_at: null,
+              days_in_stage: 3.5,
+              reason: null,
+              notes: null
+            }
+          ]
+        };
+      }
+
+      const { data, error } = await supabase.rpc("get_lead_journey_analytics", {
+        lead_id: leadId
+      });
+      
+      if (error) throw error;
+      return data;
     }
   },
 

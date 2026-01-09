@@ -339,13 +339,38 @@ export type Database = {
         Returns: {
           avg_time_in_stage: number
           conversion_rate: number
-          funnel_type: string
+          funnel_type: Database["public"]["Enums"]["funnel_type"]
           leads_entered: number
           leads_progressed: number
           leads_stuck: number
           stage_id: string
           stage_name: string
           stage_number: number
+        }[]
+      }
+      get_daily_stage_movements: {
+        Args: { end_date?: string; start_date?: string }
+        Returns: {
+          from_funnel: Database["public"]["Enums"]["funnel_type"]
+          from_stage_name: string
+          is_funnel_switch: boolean
+          movement_date: string
+          movement_reasons: Json
+          to_funnel: Database["public"]["Enums"]["funnel_type"]
+          to_stage_name: string
+          total_movements: number
+        }[]
+      }
+      get_lead_journey_analytics: {
+        Args: { p_lead_id: string }
+        Returns: {
+          current_funnel: Database["public"]["Enums"]["funnel_type"]
+          current_stage_name: string
+          current_status: Database["public"]["Enums"]["lead_status"]
+          lead_id: string
+          lead_name: string
+          stages_history: Json
+          total_journey_days: number
         }[]
       }
     }
