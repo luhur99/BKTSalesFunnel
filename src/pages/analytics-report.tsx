@@ -21,9 +21,9 @@ export default function AnalyticsReportPage() {
 
   useEffect(() => {
     // Check authentication
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
-      router.push("/login");
+    const isLoggedIn = localStorage.getItem("isLoggedIn");
+    if (!isLoggedIn) {
+      router.push("/");
       return;
     }
 
