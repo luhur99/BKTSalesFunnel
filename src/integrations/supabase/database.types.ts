@@ -358,14 +358,14 @@ export type Database = {
       }
       get_daily_stage_movements:
         | {
-            Args: { end_date?: string; start_date?: string }
+            Args: { end_date: string; start_date: string }
             Returns: {
-              from_funnel: Database["public"]["Enums"]["funnel_type"]
+              from_funnel: string
               from_stage_name: string
               is_funnel_switch: boolean
               movement_date: string
               movement_reasons: Json
-              to_funnel: Database["public"]["Enums"]["funnel_type"]
+              to_funnel: string
               to_stage_name: string
               total_movements: number
             }[]
