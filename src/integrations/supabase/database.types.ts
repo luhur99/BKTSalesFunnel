@@ -356,6 +356,19 @@ export type Database = {
           stage_number: number
         }[]
       }
+      get_daily_stage_movements: {
+        Args: { end_date: string; start_date: string }
+        Returns: {
+          from_funnel: string
+          from_stage_name: string
+          is_funnel_switch: boolean
+          movement_date: string
+          movement_reasons: Json
+          to_funnel: string
+          to_stage_name: string
+          total_movements: number
+        }[]
+      }
       get_funnel_leakage_stats: {
         Args: never
         Returns: {

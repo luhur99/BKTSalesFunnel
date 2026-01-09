@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle, Settings as SettingsIcon, BookOpen, Plus } from "lucide-react";
+import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle, Settings as SettingsIcon, BookOpen, Plus, TrendingUpIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,16 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <Link href="/analytics-report">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Analytics Report
+                  </Button>
+                </Link>
                 <Link href="/guide">
                   <Button 
                     size="sm" 
@@ -288,6 +298,31 @@ export default function Dashboard() {
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
+              {/* Full Analytics Report Button */}
+              <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <TrendingUpIcon className="w-7 h-7 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900">Full Analytics Report</h3>
+                        <p className="text-sm text-slate-600 mt-1">
+                          View detailed analytics: Stage Velocity, Lead Entry Heatmap, Funnel Health & more
+                        </p>
+                      </div>
+                    </div>
+                    <Link href="/analytics-report">
+                      <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 gap-2 h-11 px-6">
+                        <BarChart3 className="w-5 h-5" />
+                        View Full Report
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
               <BottleneckAnalytics refreshTrigger={refreshTrigger} />
             </TabsContent>
           </Tabs>
