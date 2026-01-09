@@ -7,10 +7,10 @@ import { TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, Users, Facebook,
 import { db } from "@/lib/supabase";
 import { BottleneckAnalytics as BottleneckData } from "@/types/lead";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
 
 interface BottleneckAnalyticsProps {
-  key?: string;
-  refreshTrigger?: any;
+  refreshTrigger?: number;
 }
 
 interface SourceBreakdown {
@@ -34,18 +34,6 @@ interface MonthlyDayAnalytics {
   dealsPerDay: { day: string; count: number }[];
 }
 
-interface DailyMovement {
-  movement_date: string;
-  from_stage_name: string;
-  to_stage_name: string;
-  from_funnel: string;
-  to_funnel: string;
-  is_funnel_switch: boolean;
-  funnel_switches: number;
-  total_movements: number;
-  movement_reasons: Record<string, number>;
-}
-
 interface MonthlyAnalytics {
   weeklyDeals: { week: number; count: number }[];
   weeklyLeads: any[];
@@ -62,17 +50,15 @@ interface MonthlyAnalytics {
 }
 
 export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps) {
-  const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<BottleneckData[]>([]);
   const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
   const [sourceConversion, setSourceConversion] = useState<SourceConversion[]>([]);
-  const [dailyMovements, setDailyMovements] = useState<DailyMovement[]>([]);
   const [monthlyDayAnalytics, setMonthlyDayAnalytics] = useState<MonthlyDayAnalytics | null>(null);
   const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlyAnalytics | null>(null);
   
   useEffect(() => {
     loadAnalytics();
-    loadDailyMovements();
     loadSourceBreakdown();
     loadSourceConversion();
     loadMonthlyDayAnalytics();
@@ -90,33 +76,14 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       await loadSourceConversion();
       await loadMonthlyDayAnalytics();
       await loadMonthlyAnalytics();
-      
-      // NEW: Load daily movements and leads list
-      await loadDailyMovements();
     } catch (error) {
       console.error("Error loading analytics:", error);
       // Set empty arrays on error to prevent crashes
       setAnalytics([]);
       setSourceBreakdown([]);
       setSourceConversion([]);
-      setDailyMovements([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  // NEW: Load daily movements for last 7 days
-  const loadDailyMovements = async () => {
-    try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(endDate.getDate() - 7);
-      
-      const data = await db.analytics.getDailyStageMovements(startDate, endDate);
-      setDailyMovements(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Error loading daily movements:", error);
-      setDailyMovements([]);
     }
   };
 
@@ -522,164 +489,100 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
 
   return (
     <div className="space-y-6">
-      {/* Daily Movement Trends */}
+      <AnalyticsHeader />
+
+      {/* Lead Masuk by Source */}
       <Card className="border-border/40 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <TrendingUp className="h-5 w-5 text-blue-500" />
-            Daily Movement Trends (Last 7 Days)
+            <Users className="h-5 w-5 text-blue-500" />
+            Lead Masuk by Source
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {dailyMovements.length > 0 ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Movements</p>
-                  <p className="text-2xl font-bold">
-                    {dailyMovements.reduce((sum, day) => sum + day.total_movements, 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Funnel Switches</p>
-                  <p className="text-2xl font-bold">
-                    {dailyMovements.reduce((sum, day) => sum + day.funnel_switches, 0)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Top 5 Movement Patterns:</p>
-                {dailyMovements
-                  .sort((a, b) => b.total_movements - a.total_movements)
-                  .slice(0, 5)
-                  .map((day, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {new Date(day.movement_date).toLocaleDateString("id-ID", {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-                      <div className="flex items-center gap-4">
-                        <span>
-                          {day.total_movements} moves
-                        </span>
-                        {day.funnel_switches > 0 && (
-                          <span className="text-orange-500">
-                            {day.funnel_switches} switches
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
+          {sourceBreakdown.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">Tidak ada data source</p>
           ) : (
-            <p className="text-sm text-muted-foreground">Tidak ada data pergerakan</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Lead Masuk by Source */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Source Breakdown Card */}
-        <Card className="border-slate-200 bg-white md:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="w-4 h-4 text-blue-600" />
-              </div>
-              Lead Masuk by Source
-            </CardTitle>
-            <CardDescription className="text-xs">Breakdown traffic source</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {sourceBreakdown.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">Tidak ada data source</p>
-            ) : (
-              <>
-                {sourceBreakdown.map((item, index) => {
-                  const Icon = getSourceIcon(item.source);
-                  return (
-                    <div key={item.source} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4 text-slate-600" />
-                          <span className="font-medium text-slate-700">{item.source}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-900 font-semibold">{item.count}</span>
-                          <span className="text-slate-500 text-xs">({item.percentage.toFixed(1)}%)</span>
-                        </div>
-                      </div>
-                      <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`absolute top-0 left-0 h-full ${getSourceColor(index)} transition-all duration-500`}
-                          style={{ width: `${item.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="pt-2 mt-3 border-t border-slate-200">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-slate-700">Total Leads:</span>
-                    <span className="font-bold text-slate-900">{sourceBreakdown.reduce((sum, s) => sum + s.count, 0)}</span>
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* NEW: Conversion Rate by Source Card */}
-        <Card className="border-slate-200 bg-white md:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
-              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Target className="w-4 h-4 text-purple-600" />
-              </div>
-              Conversion Rate by Source
-            </CardTitle>
-            <CardDescription className="text-xs">Persentase konversi menjadi Deal</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {sourceConversion.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">Belum ada data konversi</p>
-            ) : (
-              sourceConversion.map((item, index) => {
+            <>
+              {sourceBreakdown.map((item, index) => {
                 const Icon = getSourceIcon(item.source);
                 return (
-                  <div key={item.source} className="space-y-2">
+                  <div key={item.source} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <Icon className="w-4 h-4 text-slate-600" />
                         <span className="font-medium text-slate-700">{item.source}</span>
                       </div>
-                      <span className="text-xs text-slate-500">
-                        {item.totalLeads} leads → {item.dealLeads} deals
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 mb-1">
-                        Conversion: {item.conversionRate.toFixed(1)}%
-                      </p>
-                      <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`absolute top-0 left-0 h-full ${getConversionColor(item.conversionRate)} transition-all duration-500`}
-                          style={{ width: `${Math.min(item.conversionRate, 100)}%` }}
-                        />
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-900 font-semibold">{item.count}</span>
+                        <span className="text-slate-500 text-xs">({item.percentage.toFixed(1)}%)</span>
                       </div>
+                    </div>
+                    <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute top-0 left-0 h-full ${getSourceColor(index)} transition-all duration-500`}
+                        style={{ width: `${item.percentage}%` }}
+                      />
                     </div>
                   </div>
                 );
-              })
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              })}
+              <div className="pt-2 mt-3 border-t border-slate-200">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-slate-700">Total Leads:</span>
+                  <span className="font-bold text-slate-900">{sourceBreakdown.reduce((sum, s) => sum + s.count, 0)}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* NEW: Conversion Rate by Source Card */}
+      <Card className="border-slate-200 bg-white md:col-span-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Target className="w-4 h-4 text-purple-600" />
+            </div>
+            Conversion Rate by Source
+          </CardTitle>
+          <CardDescription className="text-xs">Persentase konversi menjadi Deal</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {sourceConversion.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-4">Belum ada data konversi</p>
+          ) : (
+            sourceConversion.map((item, index) => {
+              const Icon = getSourceIcon(item.source);
+              return (
+                <div key={item.source} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-4 h-4 text-slate-600" />
+                      <span className="font-medium text-slate-700">{item.source}</span>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                      {item.totalLeads} leads → {item.dealLeads} deals
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">
+                      Conversion: {item.conversionRate.toFixed(1)}%
+                    </p>
+                    <div className="relative h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute top-0 left-0 h-full ${getConversionColor(item.conversionRate)} transition-all duration-500`}
+                        style={{ width: `${Math.min(item.conversionRate, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-slate-200 bg-white">
