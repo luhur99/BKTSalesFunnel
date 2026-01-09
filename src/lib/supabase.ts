@@ -779,7 +779,7 @@ export const db = {
       }
 
       const { data, error } = await supabase.rpc("get_lead_journey_analytics", {
-        lead_id: leadId
+        p_lead_id: leadId
       });
       
       if (error) throw error;
