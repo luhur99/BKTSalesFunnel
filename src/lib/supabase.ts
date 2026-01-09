@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Lead, LeadSource, Stage, LeadActivity, LeadStageHistory, StageScript, BottleneckAnalytics, FunnelType } from "@/types/lead";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning } from "@/types/analytics";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
@@ -783,6 +784,91 @@ export const db = {
       
       if (error) throw error;
       return data;
+    },
+
+    // NEW: Funnel Leakage Stats
+    getFunnelLeakageStats: async (): Promise<FunnelLeakageStats> => {
+      if (!isConnected) {
+        return {
+          total_leads: 100,
+          leaked_to_broadcast: 25,
+          leakage_percentage: 25
+        };
+      }
+      const { data, error } = await supabase.rpc("get_funnel_leakage_stats");
+      if (error) {
+        console.error("Error fetching funnel leakage stats:", error);
+        return { total_leads: 0, leaked_to_broadcast: 0, leakage_percentage: 0 };
+      }
+      return data?.[0] || { total_leads: 0, leaked_to_broadcast: 0, leakage_percentage: 0 };
+    },
+
+    // NEW: Stage Velocity
+    getStageVelocity: async (): Promise<StageVelocity[]> => {
+      if (!isConnected) {
+        return [
+          { stage_name_out: "FU 1", avg_hours: "24.5", total_leads_passed: 50 },
+          { stage_name_out: "FU 2", avg_hours: "18.3", total_leads_passed: 45 },
+          { stage_name_out: "BC 1", avg_hours: "36.7", total_leads_passed: 20 }
+        ];
+      }
+      const { data, error } = await supabase.rpc("get_avg_time_per_stage");
+      if (error) {
+        console.error("Error fetching stage velocity:", error);
+        return [];
+      }
+      return data || [];
+    },
+
+    // NEW: Heatmap Analytics
+    getHeatmapAnalytics: async (targetType: "deal" | "all" = "all"): Promise<HeatmapDataPoint[]> => {
+      if (!isConnected) {
+        const mockHeatmap: HeatmapDataPoint[] = [];
+        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        for (const day of days) {
+          for (let hour = 9; hour <= 17; hour++) {
+            mockHeatmap.push({
+              day_name: day,
+              hour_of_day: hour,
+              count: Math.floor(Math.random() * 20)
+            });
+          }
+        }
+        return mockHeatmap;
+      }
+      const { data, error } = await supabase.rpc("get_heatmap_analytics", { target_type: targetType });
+      if (error) {
+        console.error("Error fetching heatmap analytics:", error);
+        return [];
+      }
+      return data || [];
+    },
+
+    // NEW: Bottleneck Warnings (Business Logic)
+    getBottleneckWarnings: async (): Promise<BottleneckWarning[]> => {
+      const velocityData = await db.analytics.getStageVelocity();
+      if (velocityData.length === 0) return [];
+
+      const avgHours = velocityData.reduce((sum, stage) => sum + parseFloat(stage.avg_hours), 0) / velocityData.length;
+      const threshold = avgHours * 1.5;
+
+      return velocityData
+        .filter(stage => parseFloat(stage.avg_hours) > threshold)
+        .map(stage => {
+          const hours = parseFloat(stage.avg_hours);
+          let severity: "low" | "medium" | "high" = "low";
+          if (hours > avgHours * 2) severity = "high";
+          else if (hours > threshold) severity = "medium";
+
+          return {
+            stage_name: stage.stage_name_out,
+            avg_hours: hours,
+            severity,
+            message: `Stage "${stage.stage_name_out}" is ${Math.round((hours / avgHours - 1) * 100)}% slower than average`,
+            total_leads: Number(stage.total_leads_passed)
+          };
+        })
+        .sort((a, b) => b.avg_hours - a.avg_hours);
     }
   },
 
