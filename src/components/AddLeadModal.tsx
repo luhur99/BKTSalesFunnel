@@ -64,14 +64,17 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         date_in: editLead.created_at ? new Date(editLead.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
       });
     } else if (isOpen && !editLead) {
-      // Reset form for new lead
+      // Reset form for new lead with defaults
+      const defaultSource = sources.length > 0 ? sources[0].id : "";
+      const defaultStage = stages.find(s => s.stage_number === 1)?.id || "";
+      
       setFormData({
         name: "",
         email: "",
         phone: "",
         company: "",
-        source_id: "",
-        current_stage_id: "",
+        source_id: defaultSource,
+        current_stage_id: defaultStage,
         status: "active",
         custom_labels: [],
         notes: "",
@@ -79,7 +82,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
         date_in: new Date().toISOString().split('T')[0]
       });
     }
-  }, [isOpen, editLead, stages]);
+  }, [isOpen, editLead, sources, stages]);
 
   const loadData = async () => {
     try {
@@ -87,23 +90,10 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       const sourcesData = await db.sources.getAll();
       setSources(sourcesData);
       
-      // Set default source if creating new lead
-      if (!editLead && sourcesData.length > 0) {
-        setFormData(prev => ({ ...prev, source_id: sourcesData[0].id }));
-      }
-      
       // Load ONLY Follow Up stages
       const followUpStages = await db.stages.getByFunnel("follow_up");
       const sortedStages = followUpStages.sort((a, b) => a.stage_number - b.stage_number);
       setStages(sortedStages);
-      
-      // Set default stage if creating new lead
-      if (!editLead && sortedStages.length > 0) {
-        const firstStage = sortedStages.find(s => s.stage_number === 1);
-        if (firstStage) {
-          setFormData(prev => ({ ...prev, current_stage_id: firstStage.id }));
-        }
-      }
       
       // Load available labels
       const customLabels = await db.customLabels.getAll();
