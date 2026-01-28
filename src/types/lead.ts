@@ -32,19 +32,27 @@ export interface StageScript {
 
 export interface Lead {
   id: string;
-  name: string | null;
+  name: string | null; // Name is now optional
   email: string | null;
-  phone: string | null;
+  phone: string; // Phone is now mandatory
   company: string | null;
   source_id: string;
   current_stage_id: string;
   current_funnel: FunnelType;
-  status: LeadStatus;
+  status: "active" | "deal" | "lost";
   last_response_date: string | null;
   last_response_note: string | null;
   custom_labels: string[];
+  deal_value?: number | null;
+  
+  // New fields for multi-brand
+  brand_id: string;
+  funnel_id?: string;
+  
   created_at: string;
   updated_at: string;
+  
+  // Relations (optional/loaded)
   source?: LeadSource;
   current_stage?: Stage;
 }

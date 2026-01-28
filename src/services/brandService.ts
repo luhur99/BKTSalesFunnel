@@ -67,7 +67,7 @@ export async function createBrand(input: CreateBrandInput): Promise<Brand> {
   const { data, error } = await supabase
     .from("brands")
     .insert({
-      user_id: user?.id || null,
+      user_id: user?.id || null, // Set to null if no authenticated user
       name: input.name,
       description: input.description,
       color: input.color || "#0055b6",

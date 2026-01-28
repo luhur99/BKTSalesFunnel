@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, Settings as SettingsIcon, BookOpen, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandCard } from "@/components/BrandCard";
+import { AddBrandModal } from "@/components/AddBrandModal";
 import { Brand } from "@/types/brand";
 import { brandService } from "@/services/brandService";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     // Check authentication
@@ -45,6 +47,15 @@ export default function Dashboard() {
 
   const handleSelectBrand = (brandId: string) => {
     router.push(`/brand/${brandId}`);
+  };
+
+  const handleAddBrandSuccess = () => {
+    toast({
+      title: "Success",
+      description: "Brand created successfully",
+    });
+    loadBrands(); // Refresh brand list
+    setShowAddModal(false);
   };
 
   const handleLogout = () => {
@@ -99,16 +110,14 @@ export default function Dashboard() {
                     Panduan
                   </Button>
                 </Link>
-                <Link href="/settings">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <SettingsIcon className="w-4 h-4" />
-                    Settings
-                  </Button>
-                </Link>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setShowAddModal(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add New Brand
+                </Button>
                 <Button 
                   size="sm" 
                   variant="outline"
@@ -131,12 +140,13 @@ export default function Dashboard() {
                   Select a brand to manage leads and view funnels
                 </p>
               </div>
-              <Link href="/settings?tab=brands">
-                <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
-                  <Plus className="w-4 h-4" />
-                  Add New Brand
-                </Button>
-              </Link>
+              <Button 
+                className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                onClick={() => setShowAddModal(true)}
+              >
+                <Plus className="w-4 h-4" />
+                Add New Brand
+              </Button>
             </div>
           </div>
 
@@ -181,6 +191,14 @@ export default function Dashboard() {
             </div>
           )}
         </main>
+
+        {/* Add Brand Modal */}
+        {showAddModal && (
+          <AddBrandModal
+            onClose={() => setShowAddModal(false)}
+            onSuccess={handleAddBrandSuccess}
+          />
+        )}
       </div>
     </>
   );
