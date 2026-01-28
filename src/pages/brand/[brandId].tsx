@@ -2,17 +2,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { ArrowLeft, Plus, List, LayoutGrid, Settings as SettingsIcon, BarChart3, Filter } from "lucide-react";
+import { ArrowLeft, Plus, FolderKanban, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LeadKanban } from "@/components/LeadKanban";
-import { LeadListView } from "@/components/LeadListView";
-import { AddLeadModal } from "@/components/AddLeadModal";
-import { Brand } from "@/types/brand";
-import { Lead } from "@/types/lead";
-import { Stage } from "@/types/lead";
+import { FunnelCard } from "@/components/FunnelCard";
+import { AddFunnelModal } from "@/components/AddFunnelModal";
+import { Brand, Funnel, CreateFunnelInput } from "@/types/brand";
 import { brandService } from "@/services/brandService";
-import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 export default function BrandPage() {
@@ -21,12 +16,9 @@ export default function BrandPage() {
   const { toast } = useToast();
 
   const [brand, setBrand] = useState<Brand | null>(null);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
+  const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedFunnel, setSelectedFunnel] = useState<"follow_up" | "broadcast" | "all">("all");
 
   useEffect(() => {
     // Check authentication
@@ -58,13 +50,9 @@ export default function BrandPage() {
       }
       setBrand(brandData);
 
-      // Load leads for this brand
-      const leadsData = await db.leads.getByBrand(id);
-      setLeads(leadsData);
-
-      // Load stages
-      const stagesData = await db.stages.getAll();
-      setStages(stagesData);
+      // Load funnels for this brand
+      const funnelsData = await brandService.getFunnelsByBrand(id);
+      setFunnels(funnelsData);
 
     } catch (error) {
       console.error("Error loading brand data:", error);
@@ -78,83 +66,30 @@ export default function BrandPage() {
     }
   };
 
-  const handleAddLead = async (newLead: Partial<Lead>) => {
+  const handleAddFunnel = async (input: CreateFunnelInput) => {
     if (!brandId || typeof brandId !== "string") return;
 
     try {
-      // Add brand_id to the lead
-      const leadWithBrand = {
-        ...newLead,
-        brand_id: brandId,
-      };
-
-      const created = await db.leads.create(leadWithBrand as Omit<Lead, "id" | "created_at" | "updated_at">);
-      setLeads([created, ...leads]);
+      const created = await brandService.createFunnel(input);
+      setFunnels([...funnels, created]);
       setShowAddModal(false);
 
       toast({
         title: "Success",
-        description: "Lead added successfully",
+        description: "Funnel created successfully",
       });
     } catch (error) {
-      console.error("Error adding lead:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add lead",
-        variant: "destructive",
-      });
+      console.error("Error adding funnel:", error);
+      throw error; // Let modal handle the error
     }
   };
 
-  const handleUpdateLead = async (leadId: string, updates: Partial<Lead>) => {
-    try {
-      const updated = await db.leads.update(leadId, updates);
-      setLeads(leads.map(l => l.id === leadId ? updated : l));
-
-      toast({
-        title: "Success",
-        description: "Lead updated successfully",
-      });
-    } catch (error) {
-      console.error("Error updating lead:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update lead",
-        variant: "destructive",
-      });
-    }
+  const handleSelectFunnel = (funnelId: string) => {
+    router.push(`/brand/${brandId}/funnel/${funnelId}`);
   };
 
-  const handleDeleteLead = async (leadId: string) => {
-    try {
-      await db.leads.delete(leadId);
-      setLeads(leads.filter(l => l.id !== leadId));
-
-      toast({
-        title: "Success",
-        description: "Lead deleted successfully",
-      });
-    } catch (error) {
-      console.error("Error deleting lead:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete lead",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Filter leads by funnel
-  const filteredLeads = selectedFunnel === "all" 
-    ? leads 
-    : leads.filter(l => l.current_funnel === selectedFunnel);
-
-  // Stats
-  const stats = {
-    total: leads.length,
-    followUp: leads.filter(l => l.current_funnel === "follow_up").length,
-    broadcast: leads.filter(l => l.current_funnel === "broadcast").length,
-  };
+  // Calculate total leads across all funnels
+  const totalLeads = funnels.reduce((sum, f) => sum + (f.total_leads_count || 0), 0);
 
   if (loading) {
     return (
@@ -174,8 +109,8 @@ export default function BrandPage() {
   return (
     <>
       <Head>
-        <title>{brand.name} - BKT-Leads</title>
-        <meta name="description" content={`Manage leads for ${brand.name}`} />
+        <title>{brand.name} - Funnels - BKT-Leads</title>
+        <meta name="description" content={`Manage funnels for ${brand.name}`} />
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -223,15 +158,8 @@ export default function BrandPage() {
                   style={{ backgroundColor: brand.color }}
                 >
                   <Plus className="w-4 h-4" />
-                  Add Lead
+                  Add Funnel
                 </Button>
-
-                <Link href="/analytics-report">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <BarChart3 className="w-4 h-4" />
-                    Analytics
-                  </Button>
-                </Link>
 
                 <Link href="/settings">
                   <Button variant="outline" size="sm" className="gap-2">
@@ -250,11 +178,11 @@ export default function BrandPage() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-600 font-medium">Total Leads</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stats.total}</p>
+                  <p className="text-sm text-slate-600 font-medium">Total Funnels</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1">{funnels.length}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
+                  <FolderKanban className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
             </div>
@@ -262,11 +190,11 @@ export default function BrandPage() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-600 font-medium">Follow-up Pipeline</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stats.followUp}</p>
+                  <p className="text-sm text-slate-600 font-medium">Total Leads</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1">{totalLeads}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <LayoutGrid className="w-6 h-6 text-green-600" />
+                  <Plus className="w-6 h-6 text-green-600" />
                 </div>
               </div>
             </div>
@@ -274,88 +202,64 @@ export default function BrandPage() {
             <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-slate-600 font-medium">Broadcast Pipeline</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stats.broadcast}</p>
+                  <p className="text-sm text-slate-600 font-medium">Active Funnels</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-1">
+                    {funnels.filter(f => f.is_active).length}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <List className="w-6 h-6 text-purple-600" />
+                  <FolderKanban className="w-6 h-6 text-purple-600" />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Filters & View Toggle */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Button
-                variant={selectedFunnel === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFunnel("all")}
-              >
-                All Leads ({stats.total})
-              </Button>
-              <Button
-                variant={selectedFunnel === "follow_up" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFunnel("follow_up")}
-              >
-                Follow-up ({stats.followUp})
-              </Button>
-              <Button
-                variant={selectedFunnel === "broadcast" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFunnel("broadcast")}
-              >
-                Broadcast ({stats.broadcast})
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewMode === "kanban" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode("kanban")}
-                className="gap-2"
-              >
-                <LayoutGrid className="w-4 h-4" />
-                Kanban
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-2"
-              >
-                <List className="w-4 h-4" />
-                List
-              </Button>
-            </div>
+          {/* Funnels Section */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Funnels</h2>
+            <p className="text-slate-600">
+              Select a funnel to manage its leads or create a new one
+            </p>
           </div>
 
-          {/* Lead View */}
-          {viewMode === "kanban" ? (
-            <LeadKanban
-              leads={filteredLeads}
-              stages={stages}
-              onUpdateLead={handleUpdateLead}
-              onDeleteLead={handleDeleteLead}
-              funnelFilter={selectedFunnel}
-            />
+          {/* Funnels Grid */}
+          {funnels.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {funnels.map((funnel) => (
+                <FunnelCard
+                  key={funnel.id}
+                  funnel={funnel}
+                  brandColor={brand.color}
+                  onSelect={handleSelectFunnel}
+                />
+              ))}
+            </div>
           ) : (
-            <LeadListView
-              leads={filteredLeads}
-              stages={stages}
-              onUpdateLead={handleUpdateLead}
-              onDeleteLead={handleDeleteLead}
-            />
+            <div className="bg-white rounded-xl p-12 text-center border-2 border-dashed border-slate-300">
+              <FolderKanban className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-slate-900 mb-2">No Funnels Yet</h3>
+              <p className="text-slate-600 mb-6 max-w-md mx-auto">
+                Get started by creating your first funnel for {brand.name}. 
+                Each funnel can have its own lead management pipeline.
+              </p>
+              <Button
+                onClick={() => setShowAddModal(true)}
+                className="gap-2"
+                style={{ backgroundColor: brand.color }}
+              >
+                <Plus className="w-4 h-4" />
+                Create First Funnel
+              </Button>
+            </div>
           )}
         </main>
 
-        {/* Add Lead Modal */}
-        {showAddModal && (
-          <AddLeadModal
-            stages={stages}
-            onAdd={handleAddLead}
+        {/* Add Funnel Modal */}
+        {showAddModal && brand && (
+          <AddFunnelModal
+            brandId={brand.id}
+            brandName={brand.name}
+            onAdd={handleAddFunnel}
             onClose={() => setShowAddModal(false)}
           />
         )}
