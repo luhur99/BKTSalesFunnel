@@ -2,39 +2,18 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { BarChart3, Users, TrendingUp, DollarSign, AlertTriangle, Settings as SettingsIcon, BookOpen, Plus, TrendingUpIcon } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Settings as SettingsIcon, BookOpen, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { LeadListView } from "@/components/LeadListView";
-import { LeadDetailModal } from "@/components/LeadDetailModal";
-import { BottleneckAnalytics } from "@/components/BottleneckAnalytics";
-import { AddLeadModal } from "@/components/AddLeadModal";
-import { Lead } from "@/types/lead";
-import { db } from "@/lib/supabase";
+import { BrandCard } from "@/components/BrandCard";
+import { Brand } from "@/types/brand";
+import { brandService } from "@/services/brandService";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const router = useRouter();
-  const [metrics, setMetrics] = useState({
-    total_leads: 0,
-    active_leads: 0,
-    leads_progressing: 0,
-    leads_stuck: 0,
-    deals_closed: 0,
-    lost_leads: 0,
-    follow_up_leads: 0,
-    broadcast_leads: 0,
-    conversion_rate: 0,
-    total_deal_value: 0
-  });
-  const [bottlenecks, setBottlenecks] = useState<any[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [editLead, setEditLead] = useState<Lead | null>(null);
-  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
-  const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("leads");
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { toast } = useToast();
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check authentication
@@ -44,56 +23,28 @@ export default function Dashboard() {
       return;
     }
 
-    loadMetrics();
-    loadBottlenecks();
-  }, [refreshTrigger, router]);
+    loadBrands();
+  }, [router]);
 
-  const loadMetrics = async () => {
+  const loadBrands = async () => {
     try {
-      const stats = await db.leads.getStats();
-      setMetrics(stats);
+      setLoading(true);
+      const data = await brandService.getBrands();
+      setBrands(data);
     } catch (error) {
-      console.error("Error loading metrics:", error);
+      console.error("Error loading brands:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load brands",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const loadBottlenecks = async () => {
-    try {
-      const analytics = await db.analytics.getBottleneckAnalytics();
-      const sorted = analytics
-        .filter(a => a.conversion_rate < 70)
-        .sort((a, b) => a.conversion_rate - b.conversion_rate)
-        .slice(0, 2);
-      setBottlenecks(sorted);
-    } catch (error) {
-      console.error("Error loading bottlenecks:", error);
-    }
-  };
-
-  const handleLeadClick = (lead: Lead) => {
-    setSelectedLead(lead);
-    setIsLeadModalOpen(true);
-  };
-
-  const handleEditClick = (lead: Lead) => {
-    console.log("🖊️ EDIT BUTTON CLICKED:");
-    console.log("  - Lead ID:", lead.id);
-    console.log("  - Lead Name:", lead.name);
-    console.log("  - Full Lead Object:", lead);
-    
-    setEditLead(lead);
-    setIsAddLeadModalOpen(true);
-  };
-
-  const handleLeadUpdate = () => {
-    setRefreshTrigger(prev => prev + 1);
-    loadMetrics();
-    loadBottlenecks();  // Also refresh bottleneck analytics
-  };
-
-  const handleCloseEditModal = () => {
-    setEditLead(null);
-    setIsAddLeadModalOpen(false);
+  const handleSelectBrand = (brandId: string) => {
+    router.push(`/brand/${brandId}`);
   };
 
   const handleLogout = () => {
@@ -160,13 +111,6 @@ export default function Dashboard() {
                 </Link>
                 <Button 
                   size="sm" 
-                  className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  onClick={() => setIsAddLeadModalOpen(true)}
-                >
-                  + Tambah Lead
-                </Button>
-                <Button 
-                  size="sm" 
                   variant="outline"
                   onClick={handleLogout}
                 >
@@ -178,173 +122,66 @@ export default function Dashboard() {
         </header>
 
         <main className="max-w-[1600px] mx-auto px-6 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Total Leads Masuk</CardDescription>
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.total_leads}</div>
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>{metrics.follow_up_leads}</strong> Follow Up</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-slate-600"><strong>{metrics.broadcast_leads}</strong> Broadcast</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Leads Progressing</CardDescription>
-                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-emerald-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.leads_progressing}</div>
-                <div className="text-sm text-slate-600">
-                  <span>Bergerak dalam <strong>7 hari terakhir</strong></span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Leads Stuck</CardDescription>
-                  <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-orange-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.leads_stuck}</div>
-                <div className="text-sm text-slate-600">
-                  <span>Tidak bergerak <strong>7+ hari</strong></span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/80 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-slate-600 font-medium">Deals Closed</CardDescription>
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900 mb-2">{metrics.deals_closed}</div>
-                <div className="text-sm text-slate-600">
-                  <span className="font-bold text-green-600">{metrics.conversion_rate.toFixed(1)}%</span>
-                  <span className="ml-1">tingkat konversi</span>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Page Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900">Your Brands</h2>
+                <p className="text-slate-600 mt-2">
+                  Select a brand to manage leads and view funnels
+                </p>
+              </div>
+              <Link href="/settings?tab=brands">
+                <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+                  <Plus className="w-4 h-4" />
+                  Add New Brand
+                </Button>
+              </Link>
+            </div>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="bg-white/80 backdrop-blur border border-slate-200 shadow-sm">
-              <TabsTrigger 
-                value="leads" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-              >
-                Daftar Leads
-              </TabsTrigger>
-              <TabsTrigger 
-                value="analytics" 
-                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-emerald-600 data-[state=active]:text-white"
-              >
-                Analytics & Bottleneck
-              </TabsTrigger>
-            </TabsList>
+          {/* Loading State */}
+          {loading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-64 bg-white/50 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          )}
 
-            <TabsContent value="leads" className="space-y-6">
-              <Card className="border-slate-200 bg-white/80 backdrop-blur">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                          <Users className="w-4 h-4 text-white" />
-                        </div>
-                        Semua Leads (Follow Up & Broadcast)
-                      </CardTitle>
-                      <CardDescription>Kelola leads dari semua funnel dalam satu tampilan</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <LeadListView 
-                    onLeadClick={handleLeadClick}
-                    onEditClick={handleEditClick}
-                    refreshTrigger={refreshTrigger}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
+          {/* Brands Grid */}
+          {!loading && brands.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {brands.map((brand) => (
+                <BrandCard
+                  key={brand.id}
+                  brand={brand}
+                  onSelect={() => handleSelectBrand(brand.id)}
+                />
+              ))}
+            </div>
+          )}
 
-            <TabsContent value="analytics" className="space-y-6">
-              {/* Full Analytics Report Button */}
-              <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <TrendingUpIcon className="w-7 h-7 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-slate-900">Full Analytics Report</h3>
-                        <p className="text-sm text-slate-600 mt-1">
-                          View detailed analytics: Stage Velocity, Lead Entry Heatmap, Funnel Health & more
-                        </p>
-                      </div>
-                    </div>
-                    <Link href="/analytics-report">
-                      <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 gap-2 h-11 px-6">
-                        <BarChart3 className="w-5 h-5" />
-                        View Full Report
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <BottleneckAnalytics refreshTrigger={refreshTrigger} />
-            </TabsContent>
-          </Tabs>
+          {/* Empty State */}
+          {!loading && brands.length === 0 && (
+            <div className="text-center py-16">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <BarChart3 className="w-12 h-12 text-blue-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">No Brands Yet</h3>
+              <p className="text-slate-600 mb-6 max-w-md mx-auto">
+                Create your first brand to start managing leads and tracking conversions
+              </p>
+              <Link href="/settings?tab=brands">
+                <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+                  <Plus className="w-4 h-4" />
+                  Create Your First Brand
+                </Button>
+              </Link>
+            </div>
+          )}
         </main>
       </div>
-
-      <LeadDetailModal
-        lead={selectedLead}
-        isOpen={isLeadModalOpen}
-        onClose={() => {
-          setIsLeadModalOpen(false);
-          setSelectedLead(null);
-        }}
-        onUpdate={handleLeadUpdate}
-      />
-
-      <AddLeadModal
-        isOpen={isAddLeadModalOpen}
-        onClose={handleCloseEditModal}
-        onSuccess={handleLeadUpdate}
-        editLead={editLead}
-      />
     </>
   );
 }
