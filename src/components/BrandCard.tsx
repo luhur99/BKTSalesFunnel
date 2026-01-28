@@ -79,7 +79,7 @@ export function BrandCard({ brand, onSelect, onEdit, onDelete }: BrandCardProps)
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="text-center p-3 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
-              {brand.total_leads || 0}
+              {brand.lead_count || 0}
             </div>
             <div className="text-xs text-slate-600 mt-1">Total Leads</div>
           </div>

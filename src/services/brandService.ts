@@ -28,17 +28,19 @@ export async function getBrands(): Promise<Brand[]> {
     .from("brands")
     .select(`
       *,
-      funnels(count)
+      funnels(count),
+      leads(count)
     `)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   
-  // Transform to include funnel_count
+  // Transform to include counts
   return (data || []).map(brand => ({
     ...brand,
     funnel_count: brand.funnels?.[0]?.count || 0,
+    lead_count: brand.leads?.[0]?.count || 0,
   })) as Brand[];
 }
 
@@ -395,3 +397,20 @@ export async function getFunnelStats(funnelId: string): Promise<FunnelStats | nu
     })),
   };
 }
+
+export const brandService = {
+  getBrands,
+  getBrandById,
+  createBrand,
+  updateBrand,
+  deleteBrand,
+  hardDeleteBrand,
+  getBrandStats,
+  getFunnelsByBrand,
+  getFunnelById,
+  createFunnel,
+  updateFunnel,
+  setDefaultFunnel,
+  deleteFunnel,
+  getFunnelStats
+};
