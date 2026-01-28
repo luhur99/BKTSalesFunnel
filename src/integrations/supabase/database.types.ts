@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -15,6 +15,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      brands: {
+        Row: {
+          color: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          color?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brands_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_labels: {
         Row: {
           color: string
@@ -41,6 +85,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      funnels: {
+        Row: {
+          brand_id: string
+          conversion_rate: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          total_leads_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          brand_id: string
+          conversion_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          total_leads_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          brand_id?: string
+          conversion_rate?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          total_leads_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnels_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_activities: {
         Row: {
@@ -167,6 +258,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          brand_id: string
           company: string | null
           created_at: string | null
           current_funnel: Database["public"]["Enums"]["funnel_type"] | null
@@ -174,6 +266,7 @@ export type Database = {
           custom_labels: string[] | null
           deal_value: number | null
           email: string | null
+          funnel_id: string
           id: string
           last_response_date: string | null
           last_response_note: string | null
@@ -184,6 +277,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          brand_id: string
           company?: string | null
           created_at?: string | null
           current_funnel?: Database["public"]["Enums"]["funnel_type"] | null
@@ -191,6 +285,7 @@ export type Database = {
           custom_labels?: string[] | null
           deal_value?: number | null
           email?: string | null
+          funnel_id: string
           id?: string
           last_response_date?: string | null
           last_response_note?: string | null
@@ -201,6 +296,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          brand_id?: string
           company?: string | null
           created_at?: string | null
           current_funnel?: Database["public"]["Enums"]["funnel_type"] | null
@@ -208,6 +304,7 @@ export type Database = {
           custom_labels?: string[] | null
           deal_value?: number | null
           email?: string | null
+          funnel_id?: string
           id?: string
           last_response_date?: string | null
           last_response_note?: string | null
@@ -219,10 +316,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "leads_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "leads_current_stage_id_fkey"
             columns: ["current_stage_id"]
             isOneToOne: false
             referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
             referencedColumns: ["id"]
           },
           {
