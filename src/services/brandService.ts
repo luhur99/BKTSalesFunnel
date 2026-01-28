@@ -204,14 +204,22 @@ export async function getBrandStats(brandId?: string): Promise<BrandStats[]> {
 export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
   const { data, error } = await supabase
     .from("funnels")
-    .select("*")
+    .select(`
+      *,
+      leads(count)
+    `)
     .eq("brand_id", brandId)
     .eq("is_active", true)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return data as Funnel[];
+  
+  // Transform to include lead count
+  return (data || []).map(funnel => ({
+    ...funnel,
+    total_leads_count: funnel.leads?.[0]?.count || 0,
+  })) as Funnel[];
 }
 
 /**
