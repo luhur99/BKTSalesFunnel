@@ -28,10 +28,11 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download, Filter, X } from "lucide-react";
+import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download, Filter, X, Trash2 } from "lucide-react";
 import { Lead, Stage, FunnelType } from "@/types/lead";
 import { db } from "@/lib/supabase";
 import * as XLSX from "xlsx";
+import { LeadDetailModal } from "@/components/LeadDetailModal";
 
 interface LeadListViewProps {
   leads: Lead[];
@@ -63,15 +64,27 @@ export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onU
   const [tempMonth, setTempMonth] = useState("");
   const [tempStartDate, setTempStartDate] = useState("");
   const [tempEndDate, setTempEndDate] = useState("");
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const handleLeadClick = (lead: Lead) => {
-    // TODO: Open lead detail modal
-    console.log("Lead clicked:", lead);
+    setSelectedLead(lead);
+    setShowDetailModal(true);
   };
 
   const handleEditClick = (lead: Lead) => {
-    // TODO: Open edit lead modal
-    console.log("Edit lead:", lead);
+    setSelectedLead(lead);
+    setShowDetailModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowDetailModal(false);
+    setSelectedLead(null);
+  };
+
+  const handleLeadUpdated = async () => {
+    // Refresh will be handled by parent component
+    handleCloseModal();
   };
 
   const applyMonthlyFilter = () => {
@@ -561,15 +574,29 @@ export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onU
                     </div>
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEditClick(lead)}
-                      className="gap-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Edit
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEditClick(lead)}
+                        className="gap-2 h-8"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm("Apakah Anda yakin ingin menghapus lead ini?")) {
+                            onDeleteLead(lead.id);
+                          }
+                        }}
+                        className="gap-2 h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -577,6 +604,16 @@ export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onU
           </TableBody>
         </Table>
       </div>
+
+      {/* Lead Detail Modal */}
+      {selectedLead && showDetailModal && (
+        <LeadDetailModal
+          lead={selectedLead}
+          isOpen={showDetailModal}
+          onClose={handleCloseModal}
+          onUpdate={handleLeadUpdated}
+        />
+      )}
     </div>
   );
 }
