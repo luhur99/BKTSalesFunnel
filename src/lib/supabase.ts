@@ -261,6 +261,29 @@ export const db = {
       return data;
     },
 
+    getByBrand: async (brandId: string) => {
+      if (!isConnected) {
+        return MOCK_LEADS
+          .filter(l => l.brand_id === brandId)
+          .map(lead => ({
+            ...lead,
+            source: MOCK_SOURCES.find(s => s.id === lead.source_id),
+            current_stage: [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES].find(s => s.id === lead.current_stage_id)
+          }));
+      }
+      const { data, error } = await supabase
+        .from("leads")
+        .select(`
+          *,
+          source:lead_sources(*),
+          current_stage:stages(*)
+        `)
+        .eq("brand_id", brandId)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+
     create: async (leadData: any) => {
       if (!isConnected) {
         const newLead = { id: `lead-${Date.now()}`, ...leadData, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -328,6 +351,18 @@ export const db = {
       const { data, error } = await supabase.from("leads").update(leadData).eq("id", leadId).select().single();
       if (error) throw error;
       return data;
+    },
+
+    delete: async (leadId: string) => {
+      if (!isConnected) {
+        const index = MOCK_LEADS.findIndex(l => l.id === leadId);
+        if (index !== -1) {
+          MOCK_LEADS.splice(index, 1);
+        }
+        return;
+      }
+      const { error } = await supabase.from("leads").delete().eq("id", leadId);
+      if (error) throw error;
     },
 
     getStats: async () => {

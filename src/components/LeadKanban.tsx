@@ -7,37 +7,20 @@ import { Lead, Stage, FunnelType } from "@/types/lead";
 import { db } from "@/lib/supabase";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MoreHorizontal, AlertCircle } from "lucide-react";
-import { Draggable } from "react-beautiful-dnd";
 
 interface LeadKanbanProps {
-  funnelType: FunnelType;
-  onLeadClick: (lead: Lead) => void;
+  leads: Lead[];
+  stages: Stage[];
+  onUpdateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
+  onDeleteLead: (leadId: string) => Promise<void>;
+  funnelFilter?: "all" | FunnelType;
 }
 
-export function LeadKanban({ funnelType, onLeadClick }: LeadKanbanProps) {
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadData();
-  }, [funnelType]);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [stagesData, leadsData] = await Promise.all([
-        db.stages.getByFunnel(funnelType),
-        db.leads.getByFunnel(funnelType)
-      ]);
-      setStages(stagesData || []);
-      setLeads(leadsData || []);
-    } catch (error) {
-      console.error("Error loading data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+export function LeadKanban({ leads, stages, onUpdateLead, onDeleteLead, funnelFilter = "all" }: LeadKanbanProps) {
+  // Filter stages by funnel if needed
+  const filteredStages = funnelFilter === "all" 
+    ? stages 
+    : stages.filter(s => s.funnel_type === funnelFilter);
 
   const getLeadsByStage = (stageId: string) => {
     return leads.filter(lead => lead.current_stage_id === stageId);
@@ -50,17 +33,14 @@ export function LeadKanban({ funnelType, onLeadClick }: LeadKanbanProps) {
     return "from-green-500 to-green-600";
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  const handleLeadClick = (lead: Lead) => {
+    // TODO: Open lead detail modal
+    console.log("Lead clicked:", lead);
+  };
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
-      {stages.map((stage) => {
+      {filteredStages.map((stage) => {
         const stageLeads = getLeadsByStage(stage.id);
         return (
           <div key={stage.id} className="flex-shrink-0 w-80">
@@ -80,7 +60,7 @@ export function LeadKanban({ funnelType, onLeadClick }: LeadKanbanProps) {
                 <Card
                   key={lead.id}
                   className="cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1 border-slate-200"
-                  onClick={() => onLeadClick(lead)}
+                  onClick={() => handleLeadClick(lead)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">

@@ -34,9 +34,10 @@ import { db } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 
 interface LeadListViewProps {
-  onLeadClick: (lead: Lead) => void;
-  onEditClick: (lead: Lead) => void;
-  refreshTrigger?: number;
+  leads: Lead[];
+  stages: Stage[];
+  onUpdateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
+  onDeleteLead: (leadId: string) => Promise<void>;
 }
 
 interface DateFilter {
@@ -46,10 +47,7 @@ interface DateFilter {
   monthLabel?: string;
 }
 
-export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: LeadListViewProps) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [loading, setLoading] = useState(true);
+export function LeadListView({ leads, stages, onUpdateLead, onDeleteLead }: LeadListViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFunnel, setFilterFunnel] = useState<"all" | FunnelType>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "deal" | "lost">("active");
@@ -63,24 +61,14 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
   const [tempStartDate, setTempStartDate] = useState("");
   const [tempEndDate, setTempEndDate] = useState("");
 
-  useEffect(() => {
-    loadData();
-  }, [refreshTrigger]);
+  const handleLeadClick = (lead: Lead) => {
+    // TODO: Open lead detail modal
+    console.log("Lead clicked:", lead);
+  };
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [leadsData, stagesData] = await Promise.all([
-        db.leads.getAll(),
-        db.stages.getAll()
-      ]);
-      setLeads(leadsData);
-      setStages(stagesData);
-    } catch (error) {
-      console.error("Error loading data:", error);
-    } finally {
-      setLoading(false);
-    }
+  const handleEditClick = (lead: Lead) => {
+    // TODO: Open edit lead modal
+    console.log("Edit lead:", lead);
   };
 
   const applyMonthlyFilter = () => {
@@ -131,20 +119,51 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
   };
 
   const handleExportToExcel = () => {
-    const exportData = filteredLeads.map(lead => ({
-      "Nama": lead.name || "-",
-      "Email": lead.email || "-",
-      "Phone": lead.phone || "-",
-      "Company": lead.company || "-",
-      "Source": lead.source?.name || "-",
-      "Funnel": lead.current_funnel === "follow_up" ? "Follow Up" : "Broadcast",
-      "Stage": lead.current_stage ? `${lead.current_stage.stage_number}. ${lead.current_stage.stage_name}` : "-",
-      "Last Response": lead.last_response_note || "-",
-      "Status": lead.status === "active" ? "Aktif" : lead.status === "deal" ? "Deal" : "Lost",
-      "Custom Labels": lead.custom_labels?.join(", ") || "-",
-      "Date In": formatDate(lead.created_at),
-      "Last Update": formatDate(lead.updated_at)
-    }));
+    const exportData = leads
+      .filter(lead => {
+        // Status filter
+        if (filterStatus !== "all" && lead.status !== filterStatus) return false;
+        
+        // Funnel filter
+        if (filterFunnel !== "all" && lead.current_funnel !== filterFunnel) return false;
+        
+        // Date filter
+        if (dateFilter.type !== "none" && dateFilter.startDate && dateFilter.endDate) {
+          const leadDate = new Date(lead.created_at);
+          const startDate = new Date(dateFilter.startDate);
+          const endDate = new Date(dateFilter.endDate);
+          
+          if (leadDate < startDate || leadDate > endDate) return false;
+        }
+        
+        // Search filter
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          return (
+            lead.name?.toLowerCase().includes(query) ||
+            lead.email?.toLowerCase().includes(query) ||
+            lead.phone?.toLowerCase().includes(query) ||
+            lead.company?.toLowerCase().includes(query) ||
+            lead.custom_labels?.some(label => label.toLowerCase().includes(query))
+          );
+        }
+        
+        return true;
+      })
+      .map(lead => ({
+        "Nama": lead.name || "-",
+        "Email": lead.email || "-",
+        "Phone": lead.phone || "-",
+        "Company": lead.company || "-",
+        "Source": lead.source?.name || "-",
+        "Funnel": lead.current_funnel === "follow_up" ? "Follow Up" : "Broadcast",
+        "Stage": lead.current_stage ? `${lead.current_stage.stage_number}. ${lead.current_stage.stage_name}` : "-",
+        "Last Response": lead.last_response_note || "-",
+        "Status": lead.status === "active" ? "Aktif" : lead.status === "deal" ? "Deal" : "Lost",
+        "Custom Labels": lead.custom_labels?.join(", ") || "-",
+        "Date In": formatDate(lead.created_at),
+        "Last Update": formatDate(lead.updated_at)
+      }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -256,17 +275,6 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
     }
     return "Filter Tanggal";
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading leads...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -476,7 +484,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                   key={lead.id}
                   className="hover:bg-slate-50 transition-colors"
                 >
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     <div className="space-y-1">
                       <div className="font-semibold text-slate-900">
                         {lead.name || <span className="text-slate-400 italic">Tanpa Nama</span>}
@@ -511,15 +519,15 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                       )}
                     </div>
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     <div className="text-sm text-slate-700">
                       {lead.source?.name || "-"}
                     </div>
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     {getFunnelBadge(lead.current_funnel)}
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     <div className="space-y-1">
                       <div className="text-sm font-medium text-slate-900">
                         {lead.current_stage?.stage_name || "-"}
@@ -529,21 +537,21 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     <div className="text-sm text-slate-600 max-w-xs truncate italic">
                       {lead.last_response_note || <span className="text-slate-400">Belum ada response</span>}
                     </div>
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     {getStatusBadge(lead.status)}
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     <div className="flex items-center gap-1 text-sm text-slate-600">
                       <Calendar className="w-3 h-3" />
                       {formatDate(lead.created_at)}
                     </div>
                   </TableCell>
-                  <TableCell onClick={() => onLeadClick(lead)} className="cursor-pointer">
+                  <TableCell onClick={() => handleLeadClick(lead)} className="cursor-pointer">
                     <div className="flex items-center gap-1 text-sm text-slate-600">
                       <Calendar className="w-3 h-3" />
                       {formatDate(lead.updated_at)}
@@ -553,7 +561,7 @@ export function LeadListView({ onLeadClick, onEditClick, refreshTrigger = 0 }: L
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => onEditClick(lead)}
+                      onClick={() => handleEditClick(lead)}
                       className="gap-2"
                     >
                       <Edit className="w-4 h-4" />

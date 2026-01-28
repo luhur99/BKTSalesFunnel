@@ -12,15 +12,13 @@ import { Loader2, X, Tag, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface AddLeadModalProps {
-  isOpen: boolean;
+  stages: Stage[];
+  onAdd: (newLead: any) => Promise<void>;
   onClose: () => void;
-  onSuccess: () => void;
-  editLead?: any;
 }
 
-export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadModalProps) {
+export function AddLeadModal({ stages, onAdd, onClose }: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
   const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
@@ -41,59 +39,15 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   });
 
   useEffect(() => {
-    if (isOpen) {
-      loadData();
-      setError(null);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen && editLead) {
-      // Prepopulate form for editing
-      setFormData({
-        name: editLead.name || "",
-        email: editLead.email || "",
-        phone: editLead.phone || "",
-        company: editLead.company || "",
-        source_id: editLead.source_id || "",
-        current_stage_id: editLead.current_stage_id || "",
-        status: editLead.status || "active",
-        custom_labels: Array.isArray(editLead.custom_labels) ? editLead.custom_labels : [],
-        notes: editLead.last_response_note || "",
-        deal_value: editLead.deal_value || "",
-        date_in: editLead.created_at ? new Date(editLead.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-      });
-    } else if (isOpen && !editLead) {
-      // Reset form for new lead with defaults
-      const defaultSource = sources.length > 0 ? sources[0].id : "";
-      const defaultStage = stages.find(s => s.stage_number === 1)?.id || "";
-      
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        company: "",
-        source_id: defaultSource,
-        current_stage_id: defaultStage,
-        status: "active",
-        custom_labels: [],
-        notes: "",
-        deal_value: "",
-        date_in: new Date().toISOString().split('T')[0]
-      });
-    }
-  }, [isOpen, editLead, sources, stages]);
+    loadData();
+    setError(null);
+  }, []);
 
   const loadData = async () => {
     try {
       // Load sources
       const sourcesData = await db.sources.getAll();
       setSources(sourcesData);
-      
-      // Load ALL stages (both Follow Up and Broadcast funnels)
-      const allStages = await db.stages.getAll();
-      const sortedStages = allStages.sort((a, b) => a.stage_number - b.stage_number);
-      setStages(sortedStages);
       
       // Load available labels
       const customLabels = await db.customLabels.getAll();
@@ -184,14 +138,9 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
       console.log("🚀 Submitting payload:", payload);
 
       // 3. Execute
-      if (editLead) {
-        await db.leads.update(editLead.id, payload);
-      } else {
-        await db.leads.create(payload);
-      }
+      await onAdd(payload);
 
       console.log("✅ Success!");
-      onSuccess();
       onClose();
 
     } catch (err: any) {
@@ -216,14 +165,12 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editLead ? "Edit Lead" : "Tambah Lead Baru"}</DialogTitle>
+          <DialogTitle>Tambah Lead Baru</DialogTitle>
           <DialogDescription>
-            {editLead 
-              ? "Update informasi lead yang sudah ada" 
-              : "Masukkan informasi lead baru ke dalam sistem"}
+            Masukkan informasi lead baru ke dalam sistem
           </DialogDescription>
         </DialogHeader>
 
@@ -479,7 +426,7 @@ export function AddLeadModal({ isOpen, onClose, onSuccess, editLead }: AddLeadMo
                   Menyimpan...
                 </>
               ) : (
-                editLead ? "Simpan Perubahan" : "Tambah Lead"
+                "Tambah Lead"
               )}
             </Button>
           </div>
