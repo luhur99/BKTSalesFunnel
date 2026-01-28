@@ -85,6 +85,11 @@ export default function BrandPage() {
       });
     } catch (error) {
       console.error("Error adding funnel:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create funnel",
+        variant: "destructive",
+      });
       throw error; // Let modal handle the error
     }
   };

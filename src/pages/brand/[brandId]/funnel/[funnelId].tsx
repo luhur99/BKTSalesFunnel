@@ -93,8 +93,14 @@ export default function FunnelViewPage() {
   const handleLeadAdded = async () => {
     // Refresh leads after adding new lead
     if (funnelId && typeof funnelId === "string") {
-      const leadsData = await db.leads.getByFunnelId(funnelId);
-      setLeads(leadsData || []);
+      try {
+        console.log("🔄 Refreshing leads after add/update...");
+        const leadsData = await db.leads.getByFunnelId(funnelId);
+        setLeads(leadsData || []);
+        console.log("✅ Leads refreshed:", leadsData?.length || 0);
+      } catch (error) {
+        console.error("❌ Error refreshing leads:", error);
+      }
     }
   };
 
