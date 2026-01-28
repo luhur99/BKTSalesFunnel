@@ -10,17 +10,17 @@ import { MoreHorizontal, AlertCircle } from "lucide-react";
 
 interface LeadKanbanProps {
   leads: Lead[];
+  funnelType?: "follow_up" | "broadcast";
+  brandId?: string;
+  funnelId?: string;
   stages: Stage[];
-  onUpdateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
-  onDeleteLead: (leadId: string) => Promise<void>;
-  funnelFilter?: "all" | FunnelType;
 }
 
-export function LeadKanban({ leads, stages, onUpdateLead, onDeleteLead, funnelFilter = "all" }: LeadKanbanProps) {
+export default function LeadKanban({ leads, funnelType, brandId, funnelId, stages }: LeadKanbanProps) {
   // Filter stages by funnel if needed
-  const filteredStages = funnelFilter === "all" 
+  const filteredStages = funnelType && funnelType !== "follow_up" && funnelType !== "broadcast" // handle 'all' or undefined
     ? stages 
-    : stages.filter(s => s.funnel_type === funnelFilter);
+    : stages.filter(s => !funnelType || s.funnel_type === funnelType);
 
   const getLeadsByStage = (stageId: string) => {
     return leads.filter(lead => lead.current_stage_id === stageId);

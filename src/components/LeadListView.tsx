@@ -35,6 +35,9 @@ import * as XLSX from "xlsx";
 
 interface LeadListViewProps {
   leads: Lead[];
+  funnelType?: "follow_up" | "broadcast";
+  brandId?: string;
+  funnelId?: string;
   stages: Stage[];
   onUpdateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
   onDeleteLead: (leadId: string) => Promise<void>;
@@ -47,7 +50,7 @@ interface DateFilter {
   monthLabel?: string;
 }
 
-export function LeadListView({ leads, stages, onUpdateLead, onDeleteLead }: LeadListViewProps) {
+export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onUpdateLead, onDeleteLead }: LeadListViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFunnel, setFilterFunnel] = useState<"all" | FunnelType>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "deal" | "lost">("active");

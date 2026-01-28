@@ -1,382 +1,313 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import Head from "next/head";
 import Link from "next/link";
-import { ArrowLeft, Plus, List, LayoutGrid, Settings as SettingsIcon, BarChart3, ChevronRight } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
-import { LeadKanban } from "@/components/LeadKanban";
-import { LeadListView } from "@/components/LeadListView";
-import { AddLeadModal } from "@/components/AddLeadModal";
-import { Brand, Funnel } from "@/types/brand";
-import { Lead, Stage } from "@/types/lead";
-import { brandService } from "@/services/brandService";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Plus, BarChart3, LayoutGrid, List } from "lucide-react";
 import { db } from "@/lib/supabase";
+import { getFunnelById } from "@/services/brandService";
+import type { Funnel } from "@/types/brand";
+import type { Lead, Stage } from "@/types/lead";
+import LeadKanban from "@/components/LeadKanban";
+import { LeadListView } from "@/components/LeadListView";
+import AddLeadModal from "@/components/AddLeadModal";
 import { useToast } from "@/hooks/use-toast";
 
-export default function FunnelPage() {
+export default function FunnelViewPage() {
   const router = useRouter();
   const { brandId, funnelId } = router.query;
   const { toast } = useToast();
 
-  const [brand, setBrand] = useState<Brand | null>(null);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedFunnel, setSelectedFunnel] = useState<"follow_up" | "broadcast" | "all">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "follow_up" | "broadcast">("all");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
 
+  // Load initial data
   useEffect(() => {
-    // Check authentication
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (!isLoggedIn) {
-      router.push("/");
-      return;
-    }
+    if (!funnelId || typeof funnelId !== "string") return;
 
-    if (brandId && funnelId && typeof brandId === "string" && typeof funnelId === "string") {
-      loadFunnelData(brandId, funnelId);
-    }
-  }, [brandId, funnelId, router]);
-
-  const loadFunnelData = async (bId: string, fId: string) => {
-    try {
-      setLoading(true);
-      
-      // Load brand info
-      const brandData = await brandService.getBrandById(bId);
-      if (!brandData) {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [funnelData, stagesData] = await Promise.all([
+          getFunnelById(funnelId as string),
+          db.stages.getAll()
+        ]);
+        setFunnel(funnelData);
+        setStages(stagesData);
+      } catch (error) {
+        console.error("Error loading data:", error);
         toast({
           title: "Error",
-          description: "Brand not found",
+          description: "Failed to load funnel data",
           variant: "destructive",
         });
-        router.push("/dashboard");
-        return;
+      } finally {
+        setLoading(false);
       }
-      setBrand(brandData);
+    }
 
-      // Load funnel info
-      const funnelData = await brandService.getFunnelById(fId);
-      if (!funnelData) {
+    loadData();
+  }, [funnelId, toast]);
+
+  // Fetch leads for this funnel
+  useEffect(() => {
+    if (!funnelId || typeof funnelId !== "string") return;
+
+    async function loadLeads() {
+      try {
+        console.log("🔍 Fetching leads for funnel:", funnelId);
+        const leadsData = await db.leads.getByFunnel(funnelId as string);
+        console.log("✅ Leads loaded:", leadsData?.length || 0);
+        setLeads(leadsData || []);
+      } catch (error) {
+        console.error("❌ Error loading leads:", error);
         toast({
           title: "Error",
-          description: "Funnel not found",
+          description: "Failed to load leads",
           variant: "destructive",
         });
-        router.push(`/brand/${bId}`);
-        return;
       }
-      setFunnel(funnelData);
+    }
 
-      // Load leads for this brand
-      const leadsData = await db.leads.getByBrand(bId);
-      setLeads(leadsData);
+    loadLeads();
+  }, [funnelId, toast]);
 
-      // Load stages
-      const stagesData = await db.stages.getAll();
-      setStages(stagesData);
+  // Filter leads based on active tab
+  const filteredLeads = leads.filter((lead) => {
+    if (activeTab === "all") return true;
+    return lead.current_funnel === activeTab;
+  });
 
-    } catch (error) {
-      console.error("Error loading funnel data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load funnel data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  // Calculate stats
+  const totalLeads = leads.length;
+  const followUpLeads = leads.filter((l) => l.current_funnel === "follow_up").length;
+  const broadcastLeads = leads.filter((l) => l.current_funnel === "broadcast").length;
+
+  const handleLeadAdded = async () => {
+    // Refresh leads after adding new lead
+    if (funnelId && typeof funnelId === "string") {
+      const leadsData = await db.leads.getByFunnel(funnelId);
+      setLeads(leadsData || []);
     }
   };
 
-  const handleAddLead = async (newLead: Partial<Lead>) => {
-    if (!brandId || typeof brandId !== "string" || !funnelId || typeof funnelId !== "string") return;
-
-    try {
-      // Add brand_id and funnel_id to the lead
-      const leadWithBrandFunnel = {
-        ...newLead,
-        brand_id: brandId,
-        funnel_id: funnelId,
-      };
-
-      const created = await db.leads.create(leadWithBrandFunnel as Omit<Lead, "id" | "created_at" | "updated_at">);
-      setLeads([created, ...leads]);
-      setShowAddModal(false);
-
-      toast({
-        title: "Success",
-        description: "Lead added successfully",
-      });
-    } catch (error) {
-      console.error("Error adding lead:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add lead",
-        variant: "destructive",
-      });
-    }
-  };
-
+  // Placeholder handlers for list view
   const handleUpdateLead = async (leadId: string, updates: Partial<Lead>) => {
     try {
-      const updated = await db.leads.update(leadId, updates);
-      setLeads(leads.map(l => l.id === leadId ? updated : l));
-
-      toast({
-        title: "Success",
-        description: "Lead updated successfully",
-      });
+      await db.leads.update(leadId, updates);
+      handleLeadAdded();
+      toast({ title: "Success", description: "Lead updated successfully" });
     } catch (error) {
-      console.error("Error updating lead:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update lead",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to update lead", variant: "destructive" });
     }
   };
 
   const handleDeleteLead = async (leadId: string) => {
     try {
       await db.leads.delete(leadId);
-      setLeads(leads.filter(l => l.id !== leadId));
-
-      toast({
-        title: "Success",
-        description: "Lead deleted successfully",
-      });
+      handleLeadAdded();
+      toast({ title: "Success", description: "Lead deleted successfully" });
     } catch (error) {
-      console.error("Error deleting lead:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete lead",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
     }
-  };
-
-  // Filter leads by funnel
-  const filteredLeads = selectedFunnel === "all" 
-    ? leads 
-    : leads.filter(l => l.current_funnel === selectedFunnel);
-
-  // Stats
-  const stats = {
-    total: leads.length,
-    followUp: leads.filter(l => l.current_funnel === "follow_up").length,
-    broadcast: leads.filter(l => l.current_funnel === "broadcast").length,
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading funnel data...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading funnel data...</p>
         </div>
       </div>
     );
   }
 
-  if (!brand || !funnel) {
-    return null;
+  if (!funnel) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-gray-600">Funnel not found</p>
+          <Button onClick={() => router.push("/dashboard")} className="mt-4">
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <>
-      <Head>
-        <title>{funnel.name} - {brand.name} - BKT-Leads</title>
-        <meta name="description" content={`Manage leads for ${funnel.name} in ${brand.name}`} />
-      </Head>
+      <SEO
+        title={`${funnel.name} - ${funnel.brand?.name || "Brand"} | Leads Management`}
+        description={`Manage leads for ${funnel.name} in ${funnel.brand?.name || "your brand"}`}
+      />
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
+          <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
+            Brands
+          </Link>
+          <span>/</span>
+          <Link
+            href={`/brand/${brandId}`}
+            className="hover:text-blue-600 transition-colors"
+          >
+            {funnel.brand?.name || "Brand"}
+          </Link>
+          <span>/</span>
+          <span className="text-gray-900 font-medium">{funnel.name}</span>
+        </div>
+
         {/* Header */}
-        <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-[1800px] mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
-              {/* Left: Breadcrumb + Funnel Info */}
-              <div className="flex items-center gap-3">
-                <Link href="/dashboard">
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    <ArrowLeft className="w-4 h-4" />
-                    Brands
-                  </Button>
-                </Link>
-                
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-
-                <Link href={`/brand/${brandId}`}>
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    {brand.name}
-                  </Button>
-                </Link>
-
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-                
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md"
-                    style={{
-                      backgroundColor: brand.color,
-                    }}
-                  >
-                    <span className="text-white font-bold text-sm">
-                      {funnel.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-slate-900">{funnel.name}</h1>
-                    {funnel.description && (
-                      <p className="text-xs text-slate-500">{funnel.description}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={() => setShowAddModal(true)}
-                  className="gap-2"
-                  style={{ backgroundColor: brand.color }}
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Lead
-                </Button>
-
-                <Link href="/analytics-report">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <BarChart3 className="w-4 h-4" />
-                    Analytics
-                  </Button>
-                </Link>
-
-                <Link href="/settings">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <SettingsIcon className="w-4 h-4" />
-                    Settings
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <main className="max-w-[1800px] mx-auto px-6 py-8">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600 font-medium">Total Leads</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stats.total}</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600 font-medium">Follow-up Pipeline</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stats.followUp}</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <LayoutGrid className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-600 font-medium">Broadcast Pipeline</p>
-                  <p className="text-3xl font-bold text-slate-900 mt-1">{stats.broadcast}</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <List className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/brand/${brandId}`)}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Funnels
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{funnel.name}</h1>
+              {funnel.description && (
+                <p className="text-gray-600 mt-1">{funnel.description}</p>
+              )}
             </div>
           </div>
 
-          {/* Filters & View Toggle */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Button
-                variant={selectedFunnel === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFunnel("all")}
-              >
-                All Leads ({stats.total})
-              </Button>
-              <Button
-                variant={selectedFunnel === "follow_up" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFunnel("follow_up")}
-              >
-                Follow-up ({stats.followUp})
-              </Button>
-              <Button
-                variant={selectedFunnel === "broadcast" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFunnel("broadcast")}
-              >
-                Broadcast ({stats.broadcast})
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewMode === "kanban" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode("kanban")}
-                className="gap-2"
-              >
-                <LayoutGrid className="w-4 h-4" />
-                Kanban
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="gap-2"
-              >
-                <List className="w-4 h-4" />
-                List
-              </Button>
-            </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/analytics-report?funnel=${funnelId}`)}
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </Button>
+            <Button onClick={() => setShowAddModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Lead
+            </Button>
           </div>
+        </div>
 
-          {/* Lead View */}
-          {viewMode === "kanban" ? (
-            <LeadKanban
-              leads={filteredLeads}
-              stages={stages}
-              onUpdateLead={handleUpdateLead}
-              onDeleteLead={handleDeleteLead}
-              funnelFilter={selectedFunnel}
-            />
-          ) : (
-            <LeadListView
-              leads={filteredLeads}
-              stages={stages}
-              onUpdateLead={handleUpdateLead}
-              onDeleteLead={handleDeleteLead}
-            />
-          )}
-        </main>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Leads</CardDescription>
+              <CardTitle className="text-3xl">{totalLeads}</CardTitle>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Follow-up Pipeline</CardDescription>
+              <CardTitle className="text-3xl text-blue-600">{followUpLeads}</CardTitle>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Broadcast Pipeline</CardDescription>
+              <CardTitle className="text-3xl text-orange-600">{broadcastLeads}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Filters and View Toggle */}
+        <div className="flex items-center justify-between mb-6">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+            <TabsList>
+              <TabsTrigger value="all">
+                All Leads ({totalLeads})
+              </TabsTrigger>
+              <TabsTrigger value="follow_up">
+                Follow-up ({followUpLeads})
+              </TabsTrigger>
+              <TabsTrigger value="broadcast">
+                Broadcast ({broadcastLeads})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === "kanban" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("kanban")}
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Kanban
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="w-4 h-4 mr-2" />
+              List
+            </Button>
+          </div>
+        </div>
+
+        {/* Lead Management View */}
+        {filteredLeads.length === 0 ? (
+          <Card className="p-12">
+            <div className="text-center">
+              <div className="text-6xl mb-4">📋</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Leads Yet</h3>
+              <p className="text-gray-600 mb-6">
+                Start adding leads to this funnel to begin tracking your sales pipeline.
+              </p>
+              <Button onClick={() => setShowAddModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Your First Lead
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            {viewMode === "kanban" ? (
+              <LeadKanban
+                leads={filteredLeads}
+                funnelType={activeTab === "all" ? undefined : activeTab}
+                brandId={brandId as string}
+                funnelId={funnelId as string}
+                stages={stages}
+              />
+            ) : (
+              <LeadListView
+                leads={filteredLeads}
+                funnelType={activeTab === "all" ? undefined : activeTab}
+                brandId={brandId as string}
+                funnelId={funnelId as string}
+                stages={stages}
+                onUpdateLead={handleUpdateLead}
+                onDeleteLead={handleDeleteLead}
+              />
+            )}
+          </>
+        )}
 
         {/* Add Lead Modal */}
         {showAddModal && (
           <AddLeadModal
-            stages={stages}
-            onAdd={handleAddLead}
+            isOpen={showAddModal}
             onClose={() => setShowAddModal(false)}
+            onLeadAdded={handleLeadAdded}
+            defaultBrandId={brandId as string}
+            defaultFunnelId={funnelId as string}
           />
         )}
       </div>

@@ -12,13 +12,22 @@ import { Loader2, X, Tag, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface AddLeadModalProps {
-  stages: Stage[];
-  onAdd: (newLead: any) => Promise<void>;
+  isOpen: boolean;
   onClose: () => void;
+  onLeadAdded?: () => void;
+  defaultBrandId?: string;
+  defaultFunnelId?: string;
 }
 
-export function AddLeadModal({ stages, onAdd, onClose }: AddLeadModalProps) {
+export default function AddLeadModal({ 
+  isOpen, 
+  onClose, 
+  onLeadAdded,
+  defaultBrandId,
+  defaultFunnelId
+}: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
   const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
@@ -48,6 +57,10 @@ export function AddLeadModal({ stages, onAdd, onClose }: AddLeadModalProps) {
       // Load sources
       const sourcesData = await db.sources.getAll();
       setSources(sourcesData);
+      
+      // Load stages
+      const stagesData = await db.stages.getAll();
+      setStages(stagesData);
       
       // Load available labels
       const customLabels = await db.customLabels.getAll();
@@ -138,7 +151,10 @@ export function AddLeadModal({ stages, onAdd, onClose }: AddLeadModalProps) {
       console.log("🚀 Submitting payload:", payload);
 
       // 3. Execute
-      await onAdd(payload);
+      await db.leads.create(payload);
+      if (onLeadAdded) {
+        onLeadAdded();
+      }
 
       console.log("✅ Success!");
       onClose();
