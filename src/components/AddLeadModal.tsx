@@ -113,6 +113,14 @@ export default function AddLeadModal({
         throw new Error("No. Phone / WhatsApp wajib diisi!");
       }
 
+      // CRITICAL FIX: Validate brand_id and funnel_id
+      if (!defaultBrandId) {
+        throw new Error("Brand ID tidak ditemukan. Silakan refresh halaman.");
+      }
+      if (!defaultFunnelId) {
+        throw new Error("Funnel ID tidak ditemukan. Silakan refresh halaman.");
+      }
+
       if (!formData.source_id) {
         // Try to set default source if missing
         if (sources.length > 0) {
@@ -124,23 +132,34 @@ export default function AddLeadModal({
 
       // Ensure stage is set
       let stageId = formData.current_stage_id;
+      let funnelType = "follow_up"; // Default
+
       if (!stageId) {
         const defaultStage = stages.find(s => s.stage_number === 1);
         if (defaultStage) {
           stageId = defaultStage.id;
+          funnelType = defaultStage.funnel_type;
         } else {
           throw new Error("Stage tidak valid. Hubungi admin untuk konfigurasi stage.");
+        }
+      } else {
+        const selectedStage = stages.find(s => s.id === stageId);
+        if (selectedStage) {
+          funnelType = selectedStage.funnel_type;
         }
       }
 
       // 2. Prepare Payload
       const payload = {
+        brand_id: defaultBrandId, // ✅ ADDED
+        funnel_id: defaultFunnelId, // ✅ ADDED
         name: formData.name.trim() || null,
         email: formData.email?.trim() || null,
         phone: formData.phone.trim(),
         company: formData.company?.trim() || null,
         source_id: formData.source_id,
         current_stage_id: stageId,
+        current_funnel: funnelType, // ✅ Using correct funnel type from stage
         status: formData.status as any,
         custom_labels: formData.custom_labels,
         last_response_note: formData.notes?.trim() || null,
@@ -165,7 +184,8 @@ export default function AddLeadModal({
       
       // User friendly error mapping
       if (err.code === "23502") {
-        errorMessage = "Data tidak lengkap: No. Phone / WhatsApp wajib diisi.";
+        if (err.message.includes("brand_id")) errorMessage = "Brand ID missing.";
+        else errorMessage = "Data tidak lengkap: Field wajib belum diisi.";
       } else if (err.message?.includes("fetch")) {
         errorMessage = "Gagal terhubung ke server. Periksa koneksi internet Anda.";
       }

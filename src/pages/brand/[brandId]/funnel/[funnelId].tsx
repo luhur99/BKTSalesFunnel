@@ -101,21 +101,33 @@ export default function FunnelViewPage() {
   // Placeholder handlers for list view
   const handleUpdateLead = async (leadId: string, updates: Partial<Lead>) => {
     try {
+      console.log("🔄 Updating lead:", leadId, updates);
       await db.leads.update(leadId, updates);
-      handleLeadAdded();
+      await handleLeadAdded(); // Refresh leads
       toast({ title: "Success", description: "Lead updated successfully" });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update lead", variant: "destructive" });
+    } catch (error: any) {
+      console.error("❌ Error updating lead:", error);
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to update lead", 
+        variant: "destructive" 
+      });
     }
   };
 
   const handleDeleteLead = async (leadId: string) => {
     try {
+      console.log("🗑️ Deleting lead:", leadId);
       await db.leads.delete(leadId);
-      handleLeadAdded();
+      await handleLeadAdded(); // Refresh leads
       toast({ title: "Success", description: "Lead deleted successfully" });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to delete lead", variant: "destructive" });
+    } catch (error: any) {
+      console.error("❌ Error deleting lead:", error);
+      toast({ 
+        title: "Error", 
+        description: error?.message || "Failed to delete lead", 
+        variant: "destructive" 
+      });
     }
   };
 
