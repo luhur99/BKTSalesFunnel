@@ -241,15 +241,16 @@ export const db = {
       return data;
     },
 
-    getByFunnel: async (funnel: FunnelType) => {
+    getByFunnelId: async (funnelId: string) => {
       if (!isConnected) {
+        // Mock implementation for offline mode
         return MOCK_LEADS
-          .filter(l => l.current_funnel === funnel)
           .map(lead => ({
             ...lead,
             source: MOCK_SOURCES.find(s => s.id === lead.source_id),
             current_stage: [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES].find(s => s.id === lead.current_stage_id)
           }));
+        // Note: In real offline mode we'd filter by funnel_id but mock data doesn't have it yet
       }
       const { data, error } = await supabase
         .from("leads")
@@ -258,30 +259,7 @@ export const db = {
           source:lead_sources(*),
           current_stage:stages(*)
         `)
-        .eq("current_funnel", funnel)
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-
-    getByBrand: async (brandId: string) => {
-      if (!isConnected) {
-        return MOCK_LEADS
-          .filter(l => l.brand_id === brandId)
-          .map(lead => ({
-            ...lead,
-            source: MOCK_SOURCES.find(s => s.id === lead.source_id),
-            current_stage: [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES].find(s => s.id === lead.current_stage_id)
-          }));
-      }
-      const { data, error } = await supabase
-        .from("leads")
-        .select(`
-          *,
-          source:lead_sources(*),
-          current_stage:stages(*)
-        `)
-        .eq("brand_id", brandId)
+        .eq("funnel_id", funnelId)
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data;

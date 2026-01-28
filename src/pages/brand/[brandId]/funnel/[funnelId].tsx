@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { SEO } from "@/components/SEO";
+import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -63,7 +63,7 @@ export default function FunnelViewPage() {
     async function loadLeads() {
       try {
         console.log("🔍 Fetching leads for funnel:", funnelId);
-        const leadsData = await db.leads.getByFunnel(funnelId as string);
+        const leadsData = await db.leads.getByFunnelId(funnelId as string);
         console.log("✅ Leads loaded:", leadsData?.length || 0);
         setLeads(leadsData || []);
       } catch (error) {
@@ -93,7 +93,7 @@ export default function FunnelViewPage() {
   const handleLeadAdded = async () => {
     // Refresh leads after adding new lead
     if (funnelId && typeof funnelId === "string") {
-      const leadsData = await db.leads.getByFunnel(funnelId);
+      const leadsData = await db.leads.getByFunnelId(funnelId);
       setLeads(leadsData || []);
     }
   };
