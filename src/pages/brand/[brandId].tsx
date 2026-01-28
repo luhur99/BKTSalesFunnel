@@ -37,6 +37,8 @@ export default function BrandPage() {
     try {
       setLoading(true);
       
+      console.log("🔍 Loading brand data for ID:", id);
+      
       // Load brand info
       const brandData = await brandService.getBrandById(id);
       if (!brandData) {
@@ -49,13 +51,16 @@ export default function BrandPage() {
         return;
       }
       setBrand(brandData);
+      console.log("✅ Brand loaded:", brandData.name);
 
       // Load funnels for this brand
       const funnelsData = await brandService.getFunnelsByBrand(id);
+      console.log("✅ Funnels loaded:", funnelsData.length, "funnels");
+      console.log("📊 Funnel details:", funnelsData);
       setFunnels(funnelsData);
 
     } catch (error) {
-      console.error("Error loading brand data:", error);
+      console.error("❌ Error loading brand data:", error);
       toast({
         title: "Error",
         description: "Failed to load brand data",

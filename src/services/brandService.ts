@@ -199,26 +199,42 @@ export async function getBrandStats(brandId?: string): Promise<BrandStats[]> {
 // ============================================================================
 
 /**
- * Get all funnels for a brand
+ * Get all funnels for a brand with lead counts
  */
 export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
-  const { data, error } = await supabase
+  // First, get all funnels for the brand
+  const { data: funnels, error: funnelError } = await supabase
     .from("funnels")
-    .select(`
-      *,
-      leads(count)
-    `)
+    .select("*")
     .eq("brand_id", brandId)
     .eq("is_active", true)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (error) throw error;
+  if (funnelError) throw funnelError;
+  if (!funnels || funnels.length === 0) return [];
+
+  // Then, get lead counts for each funnel
+  const funnelIds = funnels.map(f => f.id);
   
-  // Transform to include lead count
-  return (data || []).map(funnel => ({
+  const { data: leadCounts, error: countError } = await supabase
+    .from("leads")
+    .select("funnel_id")
+    .in("funnel_id", funnelIds);
+
+  if (countError) throw countError;
+
+  // Count leads per funnel
+  const countMap = new Map<string, number>();
+  (leadCounts || []).forEach(lead => {
+    const current = countMap.get(lead.funnel_id) || 0;
+    countMap.set(lead.funnel_id, current + 1);
+  });
+
+  // Merge counts with funnels
+  return funnels.map(funnel => ({
     ...funnel,
-    total_leads_count: funnel.leads?.[0]?.count || 0,
+    total_leads_count: countMap.get(funnel.id) || 0,
   })) as Funnel[];
 }
 
