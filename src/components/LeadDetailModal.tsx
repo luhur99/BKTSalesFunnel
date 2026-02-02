@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity, Globe, Tag } from "lucide-react";
-import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory } from "@/types/lead";
+import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity, Globe, Tag, Edit2, X, Plus } from "lucide-react";
+import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory, LeadSource } from "@/types/lead";
 import { db } from "@/lib/supabase";
 
 interface LeadDetailModalProps {
@@ -24,6 +24,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   const [activities, setActivities] = useState<LeadActivity[]>([]);
   const [stageHistory, setStageHistory] = useState<LeadStageHistory[]>([]);
   const [script, setScript] = useState<StageScript | null>(null);
+  const [sources, setSources] = useState<LeadSource[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [moveToStage, setMoveToStage] = useState("");
   const [moveNotes, setMoveNotes] = useState("");
   const [newActivity, setNewActivity] = useState({
@@ -32,10 +34,34 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     response_received: false
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [labelInput, setLabelInput] = useState("");
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    company: "",
+    source_id: "",
+    status: "active",
+    custom_labels: [] as string[],
+    deal_value: "" as string | number,
+  });
 
   useEffect(() => {
     if (lead) {
       loadLeadData();
+      // Initialize edit form with lead data
+      setEditForm({
+        name: lead.name || "",
+        email: lead.email || "",
+        phone: lead.phone || "",
+        company: lead.company || "",
+        source_id: lead.source_id || "",
+        status: lead.status || "active",
+        custom_labels: lead.custom_labels || [],
+        deal_value: lead.deal_value || "",
+      });
     }
   }, [lead]);
 
@@ -43,17 +69,21 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     if (!lead) return;
 
     try {
-      const [allStages, leadActivities, leadHistory, stageScript] = await Promise.all([
-        db.stages.getAll(), // Load ALL stages (Follow Up + Broadcast)
+      const [allStages, leadActivities, leadHistory, stageScript, allSources, customLabels] = await Promise.all([
+        db.stages.getAll(),
         db.activities.getByLead(lead.id),
         db.stageHistory.getByLead(lead.id),
-        lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null)
+        lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null),
+        db.sources.getAll(),
+        db.customLabels.getAll()
       ]);
 
       setStages(allStages || []);
       setActivities(leadActivities || []);
       setStageHistory(leadHistory || []);
       setScript(stageScript);
+      setSources(allSources || []);
+      setAvailableLabels(customLabels?.map((l: any) => l.name) || []);
     } catch (error) {
       console.error("Error loading lead data:", error);
     }
@@ -193,6 +223,69 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     }
   };
 
+  const handleAddLabel = () => {
+    if (labelInput.trim() && !editForm.custom_labels.includes(labelInput.trim())) {
+      setEditForm({ 
+        ...editForm, 
+        custom_labels: [...editForm.custom_labels, labelInput.trim()] 
+      });
+      setLabelInput("");
+    }
+  };
+
+  const handleToggleLabel = (label: string) => {
+    if (editForm.custom_labels.includes(label)) {
+      setEditForm({
+        ...editForm,
+        custom_labels: editForm.custom_labels.filter(l => l !== label)
+      });
+    } else {
+      setEditForm({
+        ...editForm,
+        custom_labels: [...editForm.custom_labels, label]
+      });
+    }
+  };
+
+  const handleRemoveLabel = (label: string) => {
+    setEditForm({
+      ...editForm,
+      custom_labels: editForm.custom_labels.filter(l => l !== label)
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!lead) return;
+
+    try {
+      setIsSubmitting(true);
+      
+      await db.leads.update(lead.id, {
+        name: editForm.name.trim() || null,
+        email: editForm.email.trim() || null,
+        phone: editForm.phone.trim(),
+        company: editForm.company.trim() || null,
+        source_id: editForm.source_id,
+        status: editForm.status as any,
+        custom_labels: editForm.custom_labels,
+        deal_value: editForm.deal_value ? Number(editForm.deal_value) : null,
+        updated_at: new Date().toISOString()
+      });
+      
+      console.log("✅ Lead updated successfully");
+      onUpdate();
+      
+      // Wait for state updates
+      await new Promise(resolve => setTimeout(resolve, 500));
+      onClose();
+    } catch (error) {
+      console.error("❌ Error updating lead:", error);
+      alert("Gagal mengupdate lead. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!lead) return null;
 
   // Group stages by funnel type for better dropdown organization
@@ -294,13 +387,179 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="history" className="mt-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="history">History Timeline</TabsTrigger>
+        <Tabs defaultValue="edit" className="mt-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="edit">Edit Lead</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="script">Script</TabsTrigger>
-            <TabsTrigger value="response">Last Response</TabsTrigger>
+            <TabsTrigger value="response">Response</TabsTrigger>
             <TabsTrigger value="move">Move Stage</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="edit" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Edit2 className="w-5 h-5" />
+                  Edit Lead Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-name">Nama</Label>
+                    <Input
+                      id="edit-name"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      placeholder="Nama lead"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit-phone">Phone / WhatsApp <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="edit-phone"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      placeholder="08123456789"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-email">Email</Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit-company">Company</Label>
+                    <Input
+                      id="edit-company"
+                      value={editForm.company}
+                      onChange={(e) => setEditForm({ ...editForm, company: e.target.value })}
+                      placeholder="Nama perusahaan"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-source">Source</Label>
+                    <Select 
+                      value={editForm.source_id} 
+                      onValueChange={(val) => setEditForm({ ...editForm, source_id: val })}
+                    >
+                      <SelectTrigger id="edit-source">
+                        <SelectValue placeholder="Pilih Source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sources.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select 
+                      value={editForm.status} 
+                      onValueChange={(val) => setEditForm({ ...editForm, status: val })}
+                    >
+                      <SelectTrigger id="edit-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="deal">Deal</SelectItem>
+                        <SelectItem value="lost">Lost</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-deal-value">Deal Value (Rp)</Label>
+                  <Input
+                    id="edit-deal-value"
+                    type="number"
+                    value={editForm.deal_value}
+                    onChange={(e) => setEditForm({ ...editForm, deal_value: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-2 block">Custom Labels</Label>
+                  
+                  {/* Available Labels Quick Select */}
+                  {availableLabels.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 rounded border">
+                      {availableLabels.map((label) => (
+                        <Badge
+                          key={label}
+                          variant={editForm.custom_labels.includes(label) ? "default" : "outline"}
+                          className="cursor-pointer hover:bg-primary/90"
+                          onClick={() => handleToggleLabel(label)}
+                        >
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add New Label */}
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      value={labelInput}
+                      onChange={(e) => setLabelInput(e.target.value)}
+                      placeholder="Tambah label baru..."
+                      onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddLabel())}
+                    />
+                    <Button type="button" onClick={handleAddLabel} variant="secondary" size="icon">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Selected Labels Display */}
+                  <div className="flex flex-wrap gap-2">
+                    {editForm.custom_labels.map((label) => (
+                      <Badge key={label} variant="secondary" className="gap-1 pl-2">
+                        <Tag className="h-3 w-3" />
+                        {label}
+                        <button 
+                          type="button" 
+                          onClick={() => handleRemoveLabel(label)}
+                          className="hover:text-red-500 ml-1"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={isSubmitting || !editForm.phone.trim()}
+                    className="flex-1"
+                  >
+                    {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="history" className="space-y-4">
             <Card>
