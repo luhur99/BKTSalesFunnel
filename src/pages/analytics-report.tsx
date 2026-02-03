@@ -25,9 +25,9 @@ export default function AnalyticsReportPage() {
   
   // Filter States
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [funnels, setFunnels] = useState<Funnel[]>([]);
-  const [selectedFunnel, setSelectedFunnel] = useState<string>("all");
+  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const [selectedFunnelId, setSelectedFunnelId] = useState<string>("all");
 
   // Analytics Data States
   const [leakageStats, setLeakageStats] = useState<FunnelLeakageStats | null>(null);
@@ -56,7 +56,7 @@ export default function AnalyticsReportPage() {
       
       // Auto-select first brand if available
       if (allBrands.length > 0) {
-        setSelectedBrand(allBrands[0].id);
+        setSelectedBrandId(allBrands[0].id);
       } else {
         // Fallback to loading data without brand filter if no brands exist
         loadAnalyticsData();
@@ -70,17 +70,17 @@ export default function AnalyticsReportPage() {
 
   // Load Funnels when Brand changes
   useEffect(() => {
-    if (selectedBrand) {
-      loadFunnels(selectedBrand);
+    if (selectedBrandId) {
+      loadFunnels(selectedBrandId);
     }
-  }, [selectedBrand]);
+  }, [selectedBrandId]);
 
   const loadFunnels = async (brandId: string) => {
     try {
       setLoading(true);
       const brandFunnels = await brandService.getFunnelsByBrand(brandId);
       setFunnels(brandFunnels);
-      setSelectedFunnel("all"); // Reset to 'All Funnels' when brand changes
+      setSelectedFunnelId("all"); // Reset to 'All Funnels' when brand changes
       
       // Load comparison data for the brand
       const comparison = await db.analytics.getFunnelPerformanceComparison(brandId);
@@ -96,11 +96,11 @@ export default function AnalyticsReportPage() {
 
   // Load Analytics Data when filters change
   useEffect(() => {
-    if (selectedBrand) {
-      const funnelIdToUse = selectedFunnel === "all" ? undefined : selectedFunnel;
+    if (selectedBrandId) {
+      const funnelIdToUse = selectedFunnelId === "all" ? undefined : selectedFunnelId;
       loadAnalyticsData(funnelIdToUse);
     }
-  }, [selectedBrand, selectedFunnel]);
+  }, [selectedBrandId, selectedFunnelId]);
 
   const loadAnalyticsData = async (funnelId?: string) => {
     try {
@@ -235,7 +235,7 @@ export default function AnalyticsReportPage() {
             </div>
             
             {/* Brand Filter */}
-            <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+            <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
               <SelectTrigger className="w-full sm:w-[200px] bg-white border-slate-200">
                 <SelectValue placeholder="Select Brand" />
               </SelectTrigger>
@@ -250,9 +250,9 @@ export default function AnalyticsReportPage() {
 
             {/* Funnel Filter */}
             <Select 
-              value={selectedFunnel} 
-              onValueChange={setSelectedFunnel}
-              disabled={!selectedBrand}
+              value={selectedFunnelId} 
+              onValueChange={setSelectedFunnelId}
+              disabled={!selectedBrandId}
             >
               <SelectTrigger className="w-full sm:w-[200px] bg-white border-slate-200">
                 <SelectValue placeholder="Select Funnel" />
@@ -270,7 +270,7 @@ export default function AnalyticsReportPage() {
         </div>
 
         {/* Funnel Performance Comparison (Only when 'All Funnels' is selected) */}
-        {selectedFunnel === "all" && funnelComparison.length > 0 && (
+        {selectedFunnelId === "all" && funnelComparison.length > 0 && (
           <section>
              <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
@@ -318,7 +318,7 @@ export default function AnalyticsReportPage() {
                       </div>
 
                       <button 
-                        onClick={() => setSelectedFunnel(funnel.funnel_id)}
+                        onClick={() => setSelectedFunnelId(funnel.funnel_id)}
                         className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm font-medium border border-slate-200"
                       >
                         View Details <ArrowRight className="w-3 h-3" />

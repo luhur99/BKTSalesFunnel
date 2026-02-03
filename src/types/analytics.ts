@@ -47,13 +47,13 @@ export interface FunnelFlowStep {
 
 // Funnel Performance Comparison
 export interface FunnelPerformanceComparison {
-  funnel_id: string;
-  funnel_name: string;
-  total_leads: number;
-  won_count: number;
-  lost_count: number;
-  conversion_rate: number;
-  avg_close_time_days: number;
+  funnelId: string;
+  funnelName: string;
+  totalLeads: number;
+  wonDeals: number;
+  lostDeals: number;
+  conversionRate: number;
+  avgCloseTime: number;
 }
 
 // Chart Data Types (for Recharts)

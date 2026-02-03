@@ -445,6 +445,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_auto_lost_leads_stats: {
+        Args: { p_days?: number; p_funnel_id?: string }
+        Returns: {
+          auto_lost_count: number
+          avg_days_in_stage: number
+          funnel_id: string
+          funnel_name: string
+        }[]
+      }
       get_avg_time_per_stage: {
         Args: never
         Returns: {
@@ -520,6 +529,18 @@ export type Database = {
           lead_name: string
           stages_history: Json
           total_journey_days: number
+        }[]
+      }
+      mark_stale_broadcast_leads_as_lost: {
+        Args: never
+        Returns: {
+          days_inactive: number
+          funnel_id: string
+          lead_id: string
+          lead_name: string
+          lead_phone: string
+          marked_at: string
+          stage_name: string
         }[]
       }
     }
