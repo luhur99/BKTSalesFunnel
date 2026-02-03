@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, TrendingUp, Filter } from "lucide-react";
+import { AlertCircle, TrendingUp, Filter, Activity } from "lucide-react";
 
 // Type definitions for chart data
 interface VelocityChartData {
