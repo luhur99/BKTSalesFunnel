@@ -531,14 +531,22 @@ export default function AnalyticsReportPage() {
 
         <Separator className="my-8" />
 
-        {/* Back to Dashboard Button */}
+        {/* Navigation Buttons */}
         <section className="text-center pb-8">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-          >
-            ← Back to Dashboard
-          </button>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="px-8 py-3 bg-white border-2 border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 hover:border-slate-400 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            >
+              ← Previous Page
+            </button>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              🏠 Dashboard
+            </button>
+          </div>
         </section>
       </div>
     </div>
