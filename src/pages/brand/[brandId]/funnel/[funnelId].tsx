@@ -32,8 +32,10 @@ export default function FunnelViewPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [analyticsTab, setAnalyticsTab] = useState<"velocity" | "heatmap">("velocity");
   const [velocityData, setVelocityData] = useState<VelocityChartData[]>([]);
-  const [heatmapChartData, setHeatmapChartData] = useState<HeatmapCell[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapCell[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [wonCount, setWonCount] = useState<number>(0);
+  const [lostCount, setLostCount] = useState<number>(0);
 
   // Load initial data
   useEffect(() => {
@@ -69,17 +71,24 @@ export default function FunnelViewPage() {
 
     async function loadLeads() {
       try {
-        console.log("🔍 Fetching leads for funnel:", funnelId);
-        const leadsData = await db.leads.getByFunnelId(funnelId as string);
-        console.log("✅ Leads loaded:", leadsData?.length || 0);
-        setLeads(leadsData || []);
+        setLoading(true);
+        const data = await db.leads.getByFunnelId(funnelId as string);
+        setLeads(data);
+        
+        // Count won and lost leads
+        const won = data.filter(lead => lead.status === 'won').length;
+        const lost = data.filter(lead => lead.status === 'lost').length;
+        setWonCount(won);
+        setLostCount(lost);
       } catch (error) {
-        console.error("❌ Error loading leads:", error);
+        console.error("Error loading leads:", error);
         toast({
+          variant: "destructive",
           title: "Error",
           description: "Failed to load leads",
-          variant: "destructive",
         });
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -136,7 +145,7 @@ export default function FunnelViewPage() {
             };
           });
           
-          setHeatmapChartData(formattedHeatmap);
+          setHeatmapData(formattedHeatmap);
           console.log("✅ Heatmap data loaded:", formattedHeatmap.length);
         }
       } catch (error) {
@@ -313,22 +322,52 @@ export default function FunnelViewPage() {
           </Card>
         </div>
 
+        {/* Win and Lost Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Won Leads</CardTitle>
+              <BarChart3 className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{wonCount}</div>
+              <p className="text-xs text-muted-foreground">
+                Successfully converted leads
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Lost Leads</CardTitle>
+              <BarChart3 className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{lostCount}</div>
+              <p className="text-xs text-muted-foreground">
+                Leads marked as lost
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="mb-6">
+          <TabsList>
+            <TabsTrigger value="all">
+              All Leads ({totalLeads})
+            </TabsTrigger>
+            <TabsTrigger value="follow_up">
+              Follow-up ({followUpLeads})
+            </TabsTrigger>
+            <TabsTrigger value="broadcast">
+              Broadcast ({broadcastLeads})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {/* Filters and View Toggle */}
         <div className="flex items-center justify-between mb-6">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList>
-              <TabsTrigger value="all">
-                All Leads ({totalLeads})
-              </TabsTrigger>
-              <TabsTrigger value="follow_up">
-                Follow-up ({followUpLeads})
-              </TabsTrigger>
-              <TabsTrigger value="broadcast">
-                Broadcast ({broadcastLeads})
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
           <div className="flex gap-2">
             <Button
               variant={viewMode === "kanban" ? "default" : "outline"}
@@ -433,8 +472,8 @@ export default function FunnelViewPage() {
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                       <p className="text-gray-600">Loading heatmap data...</p>
                     </div>
-                  ) : heatmapChartData.length > 0 ? (
-                    <HeatmapGrid data={heatmapChartData} />
+                  ) : heatmapData.length > 0 ? (
+                    <HeatmapGrid data={heatmapData} />
                   ) : (
                     <div className="text-center py-12">
                       <p className="text-gray-600">No entry pattern data available yet</p>
