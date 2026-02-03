@@ -69,3 +69,10 @@ export interface HeatmapCell {
   value: number;
   intensity: "low" | "medium" | "high" | "none";
 }
+
+export interface AutoLostLeadStats {
+  funnelId: string;
+  funnelName: string;
+  autoLostCount: number;
+  avgDaysInStage: number;
+}

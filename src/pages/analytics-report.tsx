@@ -16,7 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight } from "lucide-react";
+import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight, UserX } from "lucide-react";
+import { AutoLostLeadStats } from "@/types/analytics";
 
 export default function AnalyticsReportPage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function AnalyticsReportPage() {
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
   const [funnelComparison, setFunnelComparison] = useState<FunnelPerformanceComparison[]>([]);
+  const [autoLostStats, setAutoLostStats] = useState<AutoLostLeadStats[]>([]);
 
   useEffect(() => {
     // Check authentication
@@ -86,8 +88,18 @@ export default function AnalyticsReportPage() {
       const comparison = await db.analytics.getFunnelPerformanceComparison(brandId);
       setFunnelComparison(comparison);
 
-      // Load analytics data for this brand (and potentially 'all' funnels or default)
-      loadAnalyticsData(undefined); // Start with 'all' or let the next effect handle it
+      // Trigger auto-lost check (background)
+      db.analytics.markStaleBroadcastLeadsAsLost().then((result) => {
+        if (result.length > 0) {
+          console.log(`Auto-marked ${result.length} stale broadcast leads as lost`);
+          // Reload stats if leads were updated
+          loadAutoLostStats(undefined);
+        }
+      });
+
+      // Load analytics data
+      loadAnalyticsData(undefined);
+      loadAutoLostStats(undefined);
     } catch (err) {
       console.error("Error loading funnels:", err);
       // Don't block main analytics if funnels fail
@@ -106,6 +118,9 @@ export default function AnalyticsReportPage() {
     try {
       setLoading(true);
       setError(null);
+      
+      // Load Auto Lost Stats specifically
+      await loadAutoLostStats(funnelId);
 
       // Fetch all analytics data in parallel with error handling
       const [leakage, velocity, heatmap, warnings] = await Promise.allSettled([
@@ -140,6 +155,15 @@ export default function AnalyticsReportPage() {
       setError("Failed to load analytics data. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAutoLostStats = async (funnelId?: string) => {
+    try {
+      const stats = await db.analytics.getAutoLostLeadsStats(funnelId);
+      setAutoLostStats(stats);
+    } catch (error) {
+      console.error("Error loading auto-lost stats:", error);
     }
   };
 
@@ -268,6 +292,46 @@ export default function AnalyticsReportPage() {
             </Select>
           </div>
         </div>
+
+        {/* Auto-Lost Leads Section */}
+        {selectedBrandId && autoLostStats.length > 0 && (
+          <section>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg">
+                <UserX className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Auto-Lost Leads (7+ Days Inactive)</h2>
+                <p className="text-sm text-gray-600">Leads automatically marked as lost from last broadcast stage</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {autoLostStats.map((stat) => (
+                <Card key={stat.funnelId} className="border-red-100 hover:shadow-xl transition-all duration-300 bg-white/90 backdrop-blur">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-bold text-slate-800">{stat.funnelName}</CardTitle>
+                    <CardDescription>Inactive in Last Stage</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-3xl font-bold text-red-600">{stat.autoLostCount}</p>
+                        <p className="text-xs text-red-400 font-medium">Leads Lost</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-slate-600">{stat.avgDaysInStage} days</p>
+                        <p className="text-xs text-slate-400">Avg. Inactivity</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            <Separator className="my-8" />
+          </section>
+        )}
 
         {/* Funnel Performance Comparison (Only when 'All Funnels' is selected) */}
         {selectedFunnelId === "all" && funnelComparison.length > 0 && (
