@@ -10,10 +10,13 @@ import { db } from "@/lib/supabase";
 import { getFunnelById } from "@/services/brandService";
 import type { Funnel } from "@/types/brand";
 import type { Lead, Stage } from "@/types/lead";
+import type { StageVelocity, HeatmapDataPoint } from "@/types/analytics";
 import LeadKanban from "@/components/LeadKanban";
 import { LeadListView } from "@/components/LeadListView";
 import AddLeadModal from "@/components/AddLeadModal";
 import { useToast } from "@/hooks/use-toast";
+import { VelocityChart } from "@/components/analytics/VelocityChart";
+import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 
 export default function FunnelViewPage() {
   const router = useRouter();
@@ -27,6 +30,10 @@ export default function FunnelViewPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "follow_up" | "broadcast">("all");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [analyticsTab, setAnalyticsTab] = useState<"velocity" | "heatmap">("velocity");
+  const [stageVelocity, setStageVelocity] = useState<StageVelocity[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -78,6 +85,39 @@ export default function FunnelViewPage() {
 
     loadLeads();
   }, [funnelId, toast]);
+
+  // Load analytics data for this funnel
+  useEffect(() => {
+    if (!funnelId || typeof funnelId !== "string") return;
+
+    async function loadAnalytics() {
+      try {
+        setLoadingAnalytics(true);
+        console.log("📊 Loading analytics for funnel:", funnelId);
+
+        const [velocityData, heatmapDataResult] = await Promise.allSettled([
+          db.analytics.getStageVelocity(funnelId),
+          db.analytics.getHeatmapAnalytics("all", funnelId)
+        ]);
+
+        if (velocityData.status === "fulfilled" && Array.isArray(velocityData.value)) {
+          setStageVelocity(velocityData.value);
+          console.log("✅ Stage velocity loaded:", velocityData.value.length);
+        }
+
+        if (heatmapDataResult.status === "fulfilled" && Array.isArray(heatmapDataResult.value)) {
+          setHeatmapData(heatmapDataResult.value);
+          console.log("✅ Heatmap data loaded:", heatmapDataResult.value.length);
+        }
+      } catch (error) {
+        console.error("❌ Error loading analytics:", error);
+      } finally {
+        setLoadingAnalytics(false);
+      }
+    }
+
+    loadAnalytics();
+  }, [funnelId]);
 
   // Filter leads based on active tab
   const filteredLeads = leads.filter((lead) => {
@@ -317,6 +357,67 @@ export default function FunnelViewPage() {
             )}
           </>
         )}
+
+        {/* Detailed Analytics Section */}
+        <div className="mt-12">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Detailed Analytics</h2>
+            <p className="text-gray-600 mt-1">
+              Deep dive into stage performance and lead patterns for this funnel
+            </p>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <Tabs value={analyticsTab} onValueChange={(v) => setAnalyticsTab(v as any)}>
+                <TabsList className="mb-6">
+                  <TabsTrigger value="velocity">
+                    📊 Stage Velocity
+                  </TabsTrigger>
+                  <TabsTrigger value="heatmap">
+                    🔥 Lead Entry Patterns
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="velocity" className="mt-0">
+                  {loadingAnalytics ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Loading stage velocity data...</p>
+                    </div>
+                  ) : stageVelocity.length > 0 ? (
+                    <VelocityChart data={stageVelocity} />
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600">No velocity data available yet</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Add more leads and move them through stages to see velocity metrics
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="heatmap" className="mt-0">
+                  {loadingAnalytics ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Loading heatmap data...</p>
+                    </div>
+                  ) : heatmapData.length > 0 ? (
+                    <HeatmapGrid data={heatmapData} />
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600">No entry pattern data available yet</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Add more leads to see when they typically enter this funnel
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Add Lead Modal */}
         {showAddModal && (
