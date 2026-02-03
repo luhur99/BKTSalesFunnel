@@ -10,7 +10,7 @@ import { db } from "@/lib/supabase";
 import { getFunnelById } from "@/services/brandService";
 import type { Funnel } from "@/types/brand";
 import type { Lead, Stage } from "@/types/lead";
-import type { StageVelocity, HeatmapDataPoint } from "@/types/analytics";
+import type { StageVelocity, HeatmapDataPoint, VelocityChartData, HeatmapCell } from "@/types/analytics";
 import LeadKanban from "@/components/LeadKanban";
 import { LeadListView } from "@/components/LeadListView";
 import AddLeadModal from "@/components/AddLeadModal";
@@ -31,8 +31,8 @@ export default function FunnelViewPage() {
   const [activeTab, setActiveTab] = useState<"all" | "follow_up" | "broadcast">("all");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [analyticsTab, setAnalyticsTab] = useState<"velocity" | "heatmap">("velocity");
-  const [stageVelocity, setStageVelocity] = useState<StageVelocity[]>([]);
-  const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
+  const [velocityData, setVelocityData] = useState<VelocityChartData[]>([]);
+  const [heatmapChartData, setHeatmapChartData] = useState<HeatmapCell[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Load initial data
@@ -95,19 +95,49 @@ export default function FunnelViewPage() {
         setLoadingAnalytics(true);
         console.log("📊 Loading analytics for funnel:", funnelId);
 
-        const [velocityData, heatmapDataResult] = await Promise.allSettled([
-          db.analytics.getStageVelocity(funnelId),
-          db.analytics.getHeatmapAnalytics("all", funnelId)
+        const [velocityResult, heatmapResult] = await Promise.allSettled([
+          db.analytics.getStageVelocity(funnelId as string),
+          db.analytics.getHeatmapAnalytics("all", funnelId as string)
         ]);
 
-        if (velocityData.status === "fulfilled" && Array.isArray(velocityData.value)) {
-          setStageVelocity(velocityData.value);
-          console.log("✅ Stage velocity loaded:", velocityData.value.length);
+        // Process Velocity Data
+        if (velocityResult.status === "fulfilled" && Array.isArray(velocityResult.value)) {
+          const formattedVelocity: VelocityChartData[] = velocityResult.value.map(item => ({
+            stage: item.stage_name_out,
+            hours: parseFloat(item.avg_hours),
+            leads: item.total_leads_passed
+          }));
+          setVelocityData(formattedVelocity);
+          console.log("✅ Stage velocity loaded:", formattedVelocity.length);
         }
 
-        if (heatmapDataResult.status === "fulfilled" && Array.isArray(heatmapDataResult.value)) {
-          setHeatmapData(heatmapDataResult.value);
-          console.log("✅ Heatmap data loaded:", heatmapDataResult.value.length);
+        // Process Heatmap Data
+        if (heatmapResult.status === "fulfilled" && Array.isArray(heatmapResult.value)) {
+          const rawHeatmap = heatmapResult.value;
+          
+          // Calculate max value for intensity
+          const maxCount = Math.max(...rawHeatmap.map(d => d.count), 1);
+          
+          const formattedHeatmap: HeatmapCell[] = rawHeatmap.map(item => {
+            // Calculate intensity
+            let intensity: "low" | "medium" | "high" | "none" = "none";
+            if (item.count > 0) {
+              const ratio = item.count / maxCount;
+              if (ratio > 0.7) intensity = "high";
+              else if (ratio > 0.3) intensity = "medium";
+              else intensity = "low";
+            }
+
+            return {
+              day: item.day_name,
+              hour: item.hour_of_day,
+              value: item.count,
+              intensity
+            };
+          });
+          
+          setHeatmapChartData(formattedHeatmap);
+          console.log("✅ Heatmap data loaded:", formattedHeatmap.length);
         }
       } catch (error) {
         console.error("❌ Error loading analytics:", error);
@@ -385,8 +415,8 @@ export default function FunnelViewPage() {
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                       <p className="text-gray-600">Loading stage velocity data...</p>
                     </div>
-                  ) : stageVelocity.length > 0 ? (
-                    <VelocityChart data={stageVelocity} />
+                  ) : velocityData.length > 0 ? (
+                    <VelocityChart data={velocityData} />
                   ) : (
                     <div className="text-center py-12">
                       <p className="text-gray-600">No velocity data available yet</p>
@@ -403,8 +433,8 @@ export default function FunnelViewPage() {
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                       <p className="text-gray-600">Loading heatmap data...</p>
                     </div>
-                  ) : heatmapData.length > 0 ? (
-                    <HeatmapGrid data={heatmapData} />
+                  ) : heatmapChartData.length > 0 ? (
+                    <HeatmapGrid data={heatmapChartData} />
                   ) : (
                     <div className="text-center py-12">
                       <p className="text-gray-600">No entry pattern data available yet</p>
