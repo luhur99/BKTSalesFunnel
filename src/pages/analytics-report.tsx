@@ -19,6 +19,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight, UserX } from "lucide-react";
 import { TrendingDown, Clock, AlertTriangle, Activity } from "lucide-react";
 
+// Type definitions for chart data
+interface VelocityChartData {
+  stage: string;
+  hours: number;
+  leads: number;
+}
+
+interface HeatmapCell {
+  day: string;
+  hour: number;
+  value: number;
+  intensity: "low" | "medium" | "high" | "none";
+}
+
 export default function AnalyticsReportPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
