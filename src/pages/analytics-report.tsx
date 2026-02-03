@@ -9,7 +9,6 @@ import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { FunnelHealthCards } from "@/components/analytics/FunnelHealthCards";
 import { BottleneckWarnings } from "@/components/analytics/BottleneckWarnings";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
-import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -309,22 +308,6 @@ export default function AnalyticsReportPage() {
             </div>
           </div>
           <FunnelHealthCards funnelStats={funnelLeakageStats} />
-        </section>
-
-        <Separator className="my-8" />
-
-        {/* Follow-Up Funnel Flow - FEATURED SECTION */}
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Follow-Up Funnel Flow</h2>
-              <p className="text-sm text-gray-600">Visualisasi perjalanan lead dari masuk hingga closing</p>
-            </div>
-          </div>
-          <FollowUpFunnelFlow />
         </section>
 
         <Separator className="my-8" />
