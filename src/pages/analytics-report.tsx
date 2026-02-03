@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { db } from "@/lib/supabase";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, VelocityChartData, HeatmapCell } from "@/types/analytics";
+import { brandService } from "@/services/brandService";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, VelocityChartData, HeatmapCell, FunnelPerformanceComparison } from "@/types/analytics";
+import { Brand, Funnel } from "@/types/brand";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { FunnelHealthCards } from "@/components/analytics/FunnelHealthCards";
@@ -13,16 +15,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, TrendingUp } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight } from "lucide-react";
 
 export default function AnalyticsReportPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter States
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [funnels, setFunnels] = useState<Funnel[]>([]);
+  const [selectedFunnel, setSelectedFunnel] = useState<string>("all");
+
+  // Analytics Data States
   const [leakageStats, setLeakageStats] = useState<FunnelLeakageStats | null>(null);
   const [stageVelocity, setStageVelocity] = useState<StageVelocity[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
+  const [funnelComparison, setFunnelComparison] = useState<FunnelPerformanceComparison[]>([]);
 
   useEffect(() => {
     // Check authentication
@@ -32,21 +44,75 @@ export default function AnalyticsReportPage() {
       return;
     }
 
-    // Load analytics data
-    loadAnalyticsData();
+    // Initial load - fetch brands first
+    loadBrands();
   }, [router]);
 
-  const loadAnalyticsData = async () => {
+  // Load Brands
+  const loadBrands = async () => {
+    try {
+      const allBrands = await brandService.getBrands();
+      setBrands(allBrands);
+      
+      // Auto-select first brand if available
+      if (allBrands.length > 0) {
+        setSelectedBrand(allBrands[0].id);
+      } else {
+        // Fallback to loading data without brand filter if no brands exist
+        loadAnalyticsData();
+      }
+    } catch (err) {
+      console.error("Error loading brands:", err);
+      setError("Failed to load brands.");
+      setLoading(false);
+    }
+  };
+
+  // Load Funnels when Brand changes
+  useEffect(() => {
+    if (selectedBrand) {
+      loadFunnels(selectedBrand);
+    }
+  }, [selectedBrand]);
+
+  const loadFunnels = async (brandId: string) => {
+    try {
+      setLoading(true);
+      const brandFunnels = await brandService.getFunnelsByBrand(brandId);
+      setFunnels(brandFunnels);
+      setSelectedFunnel("all"); // Reset to 'All Funnels' when brand changes
+      
+      // Load comparison data for the brand
+      const comparison = await db.analytics.getFunnelPerformanceComparison(brandId);
+      setFunnelComparison(comparison);
+
+      // Load analytics data for this brand (and potentially 'all' funnels or default)
+      loadAnalyticsData(undefined); // Start with 'all' or let the next effect handle it
+    } catch (err) {
+      console.error("Error loading funnels:", err);
+      // Don't block main analytics if funnels fail
+    }
+  };
+
+  // Load Analytics Data when filters change
+  useEffect(() => {
+    if (selectedBrand) {
+      const funnelIdToUse = selectedFunnel === "all" ? undefined : selectedFunnel;
+      loadAnalyticsData(funnelIdToUse);
+    }
+  }, [selectedBrand, selectedFunnel]);
+
+  const loadAnalyticsData = async (funnelId?: string) => {
     try {
       setLoading(true);
       setError(null);
 
       // Fetch all analytics data in parallel with error handling
       const [leakage, velocity, heatmap, warnings] = await Promise.allSettled([
-        db.analytics.getFunnelLeakageStats(),
-        db.analytics.getStageVelocity(),
-        db.analytics.getHeatmapAnalytics("all"),
-        db.analytics.getBottleneckWarnings()
+        db.analytics.getFunnelLeakageStats(funnelId),
+        db.analytics.getStageVelocity(funnelId),
+        db.analytics.getHeatmapAnalytics("all", funnelId),
+        db.analytics.getBottleneckWarnings(funnelId)
       ]);
 
       // Process leakage stats
@@ -105,11 +171,24 @@ export default function AnalyticsReportPage() {
       })
     : [];
 
-  if (loading) {
+  // Default leakage stats if not available
+  const displayLeakageStats = leakageStats || {
+    total_leads: 0,
+    leaked_to_broadcast: 0,
+    leakage_percentage: 0
+  };
+
+  if (loading && !leakageStats) { // Only show full skeleton on initial load
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
         <div className="max-w-7xl mx-auto">
-          <Skeleton className="h-24 w-full mb-8 rounded-xl" />
+          <div className="flex justify-between items-center mb-8">
+            <Skeleton className="h-10 w-64 rounded-xl" />
+            <div className="flex gap-4">
+              <Skeleton className="h-10 w-40 rounded-xl" />
+              <Skeleton className="h-10 w-40 rounded-xl" />
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Skeleton className="h-36 rounded-xl" />
             <Skeleton className="h-36 rounded-xl" />
@@ -122,7 +201,7 @@ export default function AnalyticsReportPage() {
     );
   }
 
-  if (error) {
+  if (error && !leakageStats) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
         <div className="max-w-7xl mx-auto">
@@ -141,19 +220,118 @@ export default function AnalyticsReportPage() {
     );
   }
 
-  // Default leakage stats if not available
-  const displayLeakageStats = leakageStats || {
-    total_leads: 0,
-    leaked_to_broadcast: 0,
-    leakage_percentage: 0
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header */}
-        <AnalyticsHeader />
+        {/* Header & Filters */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+          <AnalyticsHeader />
+          
+          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto bg-white/80 p-4 rounded-xl shadow-sm border border-white/50 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-medium text-slate-700">Filters:</span>
+            </div>
+            
+            {/* Brand Filter */}
+            <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+              <SelectTrigger className="w-full sm:w-[200px] bg-white border-slate-200">
+                <SelectValue placeholder="Select Brand" />
+              </SelectTrigger>
+              <SelectContent>
+                {brands.map((brand) => (
+                  <SelectItem key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Funnel Filter */}
+            <Select 
+              value={selectedFunnel} 
+              onValueChange={setSelectedFunnel}
+              disabled={!selectedBrand}
+            >
+              <SelectTrigger className="w-full sm:w-[200px] bg-white border-slate-200">
+                <SelectValue placeholder="Select Funnel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Funnels</SelectItem>
+                {funnels.map((funnel) => (
+                  <SelectItem key={funnel.id} value={funnel.id}>
+                    {funnel.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Funnel Performance Comparison (Only when 'All Funnels' is selected) */}
+        {selectedFunnel === "all" && funnelComparison.length > 0 && (
+          <section>
+             <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                <BarChart3 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Funnel Sales Comparison</h2>
+                <p className="text-sm text-gray-600">Analyze which funnel drives the best sales performance</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {funnelComparison.map((funnel) => (
+                <Card key={funnel.funnel_id} className="border-slate-200 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white/90 backdrop-blur">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg font-bold text-slate-800">{funnel.funnel_name}</CardTitle>
+                      <div className={`px-2 py-1 rounded-full text-xs font-bold ${
+                        funnel.conversion_rate > 20 ? 'bg-green-100 text-green-700' : 
+                        funnel.conversion_rate > 10 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {funnel.conversion_rate.toFixed(1)}% CR
+                      </div>
+                    </div>
+                    <CardDescription>Total Leads: {funnel.total_leads}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                          <p className="text-xs text-green-600 font-medium mb-1">Won Deals</p>
+                          <p className="text-2xl font-bold text-green-700">{funnel.won_count}</p>
+                        </div>
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-100">
+                          <p className="text-xs text-red-600 font-medium mb-1">Lost Deals</p>
+                          <p className="text-2xl font-bold text-red-700">{funnel.lost_count}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-slate-100">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500">Avg. Close Time</span>
+                          <span className="font-medium text-slate-700">{funnel.avg_close_time_days} days</span>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => setSelectedFunnel(funnel.funnel_id)}
+                        className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100 hover:text-blue-600 transition-colors text-sm font-medium border border-slate-200"
+                      >
+                        View Details <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            <Separator className="my-8" />
+          </section>
+        )}
 
         {/* Funnel Health Cards */}
         <section>

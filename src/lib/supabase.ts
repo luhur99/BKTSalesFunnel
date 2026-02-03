@@ -868,7 +868,12 @@ export const db = {
         const stageGroups = new Map<string, { name: string; times: number[]; count: number }>();
         
         (data || []).forEach(history => {
-          const stageName = history.to_stage?.stage_name || "Unknown";
+          // Handle potential array return from relation
+          const stageData = history.to_stage as any;
+          const stageName = Array.isArray(stageData) 
+            ? stageData[0]?.stage_name 
+            : stageData?.stage_name || "Unknown";
+            
           if (!stageGroups.has(stageName)) {
             stageGroups.set(stageName, { name: stageName, times: [], count: 0 });
           }
