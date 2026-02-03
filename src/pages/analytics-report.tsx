@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { db } from "@/lib/supabase";
 import { brandService } from "@/services/brandService";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning } from "@/types/analytics";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep } from "@/types/analytics";
 import { Brand, Funnel } from "@/types/brand";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { FunnelHealthCards } from "@/components/analytics/FunnelHealthCards";
 import { BottleneckWarnings } from "@/components/analytics/BottleneckWarnings";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
+import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +48,7 @@ export default function AnalyticsReportPage() {
   const [stageVelocity, setStageVelocity] = useState<StageVelocity[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
+  const [funnelFlowData, setFunnelFlowData] = useState<FunnelFlowStep[]>([]);
 
   useEffect(() => {
     // Check authentication
@@ -123,6 +125,7 @@ export default function AnalyticsReportPage() {
       setStageVelocity([]);
       setHeatmapData([]);
       setBottleneckWarnings([]);
+      setFunnelFlowData([]);
       
       // Fetch leakage stats for each funnel in the brand
       let leakageStatsData: Array<FunnelLeakageStats & { funnel_name: string }> = [];
@@ -148,10 +151,11 @@ export default function AnalyticsReportPage() {
       setFunnelLeakageStats(leakageStatsData);
 
       // Fetch other analytics data in parallel
-      const [velocity, heatmap, warnings] = await Promise.allSettled([
+      const [velocity, heatmap, warnings, funnelFlow] = await Promise.allSettled([
         db.analytics.getStageVelocity(funnelId),
         db.analytics.getHeatmapAnalytics("all", funnelId),
-        db.analytics.getBottleneckWarnings(funnelId)
+        db.analytics.getBottleneckWarnings(funnelId),
+        db.analytics.getFunnelFlowData(funnelId)
       ]);
 
       // Process stage velocity
@@ -167,6 +171,11 @@ export default function AnalyticsReportPage() {
       // Process bottleneck warnings
       if (warnings.status === "fulfilled" && Array.isArray(warnings.value)) {
         setBottleneckWarnings(warnings.value);
+      }
+
+      // Process funnel flow data
+      if (funnelFlow.status === "fulfilled" && Array.isArray(funnelFlow.value)) {
+        setFunnelFlowData(funnelFlow.value);
       }
 
     } catch (error) {
@@ -311,6 +320,33 @@ export default function AnalyticsReportPage() {
         </section>
 
         <Separator className="my-8" />
+
+        {/* Follow-Up Funnel Flow - Only for PowerDash Brand's First Funnel */}
+        {(() => {
+          const selectedBrand = brands.find(b => b.id === selectedBrandId);
+          const isPowerDashBrand = selectedBrand?.name.toLowerCase() === "powerdash";
+          const isFirstFunnel = funnels.length > 0 && selectedFunnelId === funnels[0].id;
+          const shouldShowFunnelFlow = isPowerDashBrand && isFirstFunnel;
+
+          if (shouldShowFunnelFlow) {
+            return (
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Follow-Up Funnel Flow</h2>
+                    <p className="text-sm text-gray-600">Visualisasi perjalanan lead dari masuk hingga closing</p>
+                  </div>
+                </div>
+                <FollowUpFunnelFlow flowData={funnelFlowData} />
+                <Separator className="my-8" />
+              </section>
+            );
+          }
+          return null;
+        })()}
 
         {/* Bottleneck Warnings */}
         {bottleneckWarnings.length > 0 && (
