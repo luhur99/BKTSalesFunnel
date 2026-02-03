@@ -1110,55 +1110,101 @@ export const db = {
           }
         ];
       }
-      // Since this is a specific aggregation, we'll mock the structure for now or implement logic
-      // Ideally this comes from a RPC or complex query. 
-      // Implementing a basic logic here:
       
-      let query = supabase.from("leads").select("id, funnel_id, status, current_stage_id, updated_at, funnel:funnels(name)");
-      if (funnelId) {
-        query = query.eq("funnel_id", funnelId);
-      }
-      
-      const { data: leads, error } = await query;
-      
-      if (error || !leads) return [];
-
-      // Filter for 'lost' leads that might be considered 'auto-lost' (e.g. status='lost')
-      // For this demo, we'll assume lost leads are auto-lost
-      const lostLeads = leads.filter(l => l.status === 'lost');
-      
-      // Group by funnel
-      const funnelMap = new Map();
-      
-      lostLeads.forEach(lead => {
-        const fId = lead.funnel_id || 'unknown';
-        const fName = (lead.funnel as any)?.name || 'Unknown Funnel';
+      try {
+        // Query to get lost leads with their funnel information
+        let query = supabase
+          .from("leads")
+          .select(`
+            id,
+            funnel_id,
+            status,
+            created_at,
+            updated_at,
+            funnel:funnels(id, name)
+          `)
+          .eq("status", "lost");
         
-        if (!funnelMap.has(fId)) {
-          funnelMap.set(fId, {
-            funnelId: fId,
-            funnelName: fName,
-            autoLostCount: 0,
-            totalDays: 0,
-            count: 0
-          });
+        if (funnelId) {
+          query = query.eq("funnel_id", funnelId);
         }
         
-        const stats = funnelMap.get(fId);
-        stats.autoLostCount++;
+        const { data: lostLeads, error } = await query;
         
-        // Calculate days since update (mocking 'time in stage')
-        const days = (new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 3600 * 24);
-        stats.totalDays += days;
-        stats.count++;
-      });
-      
-      return Array.from(funnelMap.values()).map(stat => ({
-        funnelId: stat.funnelId,
-        funnelName: stat.funnelName,
-        autoLostCount: stat.autoLostCount,
-        avgDaysInStage: stat.count > 0 ? Math.round((stat.totalDays / stat.count) * 10) / 10 : 0
-      }));
+        if (error) {
+          console.error("Error fetching lost leads:", error);
+          return [];
+        }
+        
+        if (!lostLeads || lostLeads.length === 0) {
+          console.log("No lost leads found");
+          return [];
+        }
+        
+        console.log(`Found ${lostLeads.length} lost leads`);
+        
+        // Get stage history for these leads to calculate time in stage
+        const leadIds = lostLeads.map(l => l.id);
+        const { data: stageHistory, error: historyError } = await supabase
+          .from("lead_stage_history")
+          .select("lead_id, moved_at")
+          .in("lead_id", leadIds)
+          .order("moved_at", { ascending: false });
+        
+        if (historyError) {
+          console.error("Error fetching stage history:", historyError);
+        }
+        
+        // Group by funnel and calculate stats
+        const funnelStatsMap = new Map<string, {
+          funnelId: string;
+          funnelName: string;
+          autoLostCount: number;
+          totalDays: number
+        }>();
+        
+        lostLeads.forEach(lead => {
+          const funnelData = Array.isArray(lead.funnel) ? lead.funnel[0] : lead.funnel;
+          const fId = lead.funnel_id || 'unknown';
+          const fName = (funnelData as any)?.name || 'Unknown Funnel';
+          
+          if (!funnelStatsMap.has(fId)) {
+            funnelStatsMap.set(fId, {
+              funnelId: fId,
+              funnelName: fName,
+              autoLostCount: 0,
+              totalDays: 0
+            });
+          }
+          
+          const stats = funnelStatsMap.get(fId)!;
+          stats.autoLostCount++;
+          
+          // Calculate days from creation to now (time as lost lead)
+          const createdDate = new Date(lead.created_at);
+          const updatedDate = new Date(lead.updated_at);
+          const daysSinceUpdate = (new Date().getTime() - updatedDate.getTime()) / (1000 * 60 * 60 * 24);
+          
+          stats.totalDays += daysSinceUpdate;
+        });
+        
+        // Convert to array and calculate averages
+        const result = Array.from(funnelStatsMap.values()).map(stat => ({
+          funnelId: stat.funnelId,
+          funnelName: stat.funnelName,
+          autoLostCount: stat.autoLostCount,
+          avgDaysInStage: stat.autoLostCount > 0 
+            ? Math.round((stat.totalDays / stat.autoLostCount) * 10) / 10 
+            : 0
+        }));
+        
+        console.log("Auto-lost stats calculated:", result);
+        return result;
+        
+      } catch (error) {
+        console.error("Error in getAutoLostLeadsStats:", error);
+        return [];
+      }
     },
 
     // NEW: Mark Stale Broadcast Leads as Lost (Background Task)
