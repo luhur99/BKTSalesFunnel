@@ -94,13 +94,17 @@ export default function AnalyticsReportPage() {
   const loadFunnels = async (brandId: string) => {
     try {
       setLoading(true);
+      
+      // Clear comparison data when changing brands
+      setFunnelComparison([]);
+      
       const brandFunnels = await brandService.getFunnelsByBrand(brandId);
       setFunnels(brandFunnels);
       setSelectedFunnelId("all"); // Reset to 'All Funnels' when brand changes
       
       // Load comparison data for the brand
       const comparison = await db.analytics.getFunnelPerformanceComparison(brandId);
-      setFunnelComparison(comparison);
+      setFunnelComparison(comparison || []);
 
       // Trigger auto-lost check (background)
       db.analytics.markStaleBroadcastLeadsAsLost().then((result) => {
@@ -133,6 +137,13 @@ export default function AnalyticsReportPage() {
     try {
       setLoading(true);
       setError(null);
+      
+      // Clear existing data to prevent showing stale data
+      setFunnelLeakageStats([]);
+      setStageVelocity([]);
+      setHeatmapData([]);
+      setBottleneckWarnings([]);
+      setAutoLostStats([]);
       
       // Load auto-lost stats
       await loadAutoLostStats(funnelId);
@@ -193,9 +204,10 @@ export default function AnalyticsReportPage() {
   const loadAutoLostStats = async (funnelId?: string) => {
     try {
       const stats = await db.analytics.getAutoLostLeadsStats(funnelId);
-      setAutoLostStats(stats);
+      setAutoLostStats(stats || []);
     } catch (error) {
       console.error("Error loading auto-lost stats:", error);
+      setAutoLostStats([]); // Clear on error
     }
   };
 
