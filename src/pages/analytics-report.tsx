@@ -106,29 +106,30 @@ export default function AnalyticsReportPage() {
       db.analytics.markStaleBroadcastLeadsAsLost().then((result) => {
         if (result.length > 0) {
           console.log(`Auto-marked ${result.length} stale broadcast leads as lost`);
-          // Reload stats if leads were updated
-          loadAutoLostStats(undefined);
         }
       });
 
-      // Load analytics data
-      loadAnalyticsData(undefined);
-      loadAutoLostStats(undefined);
+      // Load analytics data using fresh brandFunnels
+      await loadAnalyticsDataForFunnels(brandFunnels, undefined);
+      await loadAutoLostStats(undefined);
     } catch (err) {
       console.error("Error loading funnels:", err);
-      // Don't block main analytics if funnels fail
+      setError("Failed to load funnels.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Load Analytics Data when filters change
+  // Load Analytics Data when funnel filter changes (brand changes are handled in loadFunnels)
   useEffect(() => {
-    if (selectedBrandId) {
+    if (selectedBrandId && funnels.length > 0) {
       const funnelIdToUse = selectedFunnelId === "all" ? undefined : selectedFunnelId;
-      loadAnalyticsData(funnelIdToUse);
+      loadAnalyticsDataForFunnels(funnels, funnelIdToUse);
+      loadAutoLostStats(funnelIdToUse);
     }
-  }, [selectedBrandId, selectedFunnelId]);
+  }, [selectedFunnelId]);
 
-  const loadAnalyticsData = async (funnelId?: string) => {
+  const loadAnalyticsDataForFunnels = async (funnelsList: Funnel[], funnelId?: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -142,13 +143,13 @@ export default function AnalyticsReportPage() {
       if (funnelId && funnelId !== "all") {
         // Single funnel selected - get its stats
         const stats = await db.analytics.getFunnelLeakageStats(funnelId);
-        const funnelName = funnels.find(f => f.id === funnelId)?.name || "Unknown Funnel";
+        const funnelName = funnelsList.find(f => f.id === funnelId)?.name || "Unknown Funnel";
         if (stats) {
           leakageStatsData = [{ ...stats, funnel_name: funnelName }];
         }
-      } else if (funnels.length > 0) {
+      } else if (funnelsList.length > 0) {
         // All funnels - get stats for each
-        const statsPromises = funnels.map(async (funnel) => {
+        const statsPromises = funnelsList.map(async (funnel) => {
           const stats = await db.analytics.getFunnelLeakageStats(funnel.id);
           return stats ? { ...stats, funnel_name: funnel.name } : null;
         });
