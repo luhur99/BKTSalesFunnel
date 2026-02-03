@@ -308,7 +308,7 @@ export default function AnalyticsReportPage() {
         </div>
 
         {/* Auto-Lost Leads Section */}
-        {selectedBrandId && autoLostStats.length > 0 && (
+        {selectedBrandId && selectedFunnelId !== "all" && autoLostStats.length > 0 && (
           <section>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg">
