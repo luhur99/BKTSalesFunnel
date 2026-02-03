@@ -45,7 +45,7 @@ export default function AnalyticsReportPage() {
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>("all");
 
   // Analytics Data States
-  const [leakageStats, setLeakageStats] = useState<FunnelLeakageStats | null>(null);
+  const [funnelLeakageStats, setFunnelLeakageStats] = useState<Array<FunnelLeakageStats & { funnel_name: string }>>([]);
   const [stageVelocity, setStageVelocity] = useState<StageVelocity[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
@@ -136,18 +136,35 @@ export default function AnalyticsReportPage() {
       // Load auto-lost stats
       await loadAutoLostStats(funnelId);
 
-      // Fetch all analytics data in parallel with error handling
-      const [leakage, velocity, heatmap, warnings] = await Promise.allSettled([
-        db.analytics.getFunnelLeakageStats(funnelId),
+      // Fetch leakage stats for each funnel in the brand
+      let leakageStatsData: Array<FunnelLeakageStats & { funnel_name: string }> = [];
+      
+      if (funnelId && funnelId !== "all") {
+        // Single funnel selected - get its stats
+        const stats = await db.analytics.getFunnelLeakageStats(funnelId);
+        const funnelName = funnels.find(f => f.id === funnelId)?.name || "Unknown Funnel";
+        if (stats) {
+          leakageStatsData = [{ ...stats, funnel_name: funnelName }];
+        }
+      } else if (funnels.length > 0) {
+        // All funnels - get stats for each
+        const statsPromises = funnels.map(async (funnel) => {
+          const stats = await db.analytics.getFunnelLeakageStats(funnel.id);
+          return stats ? { ...stats, funnel_name: funnel.name } : null;
+        });
+        
+        const results = await Promise.all(statsPromises);
+        leakageStatsData = results.filter((s): s is FunnelLeakageStats & { funnel_name: string } => s !== null);
+      }
+      
+      setFunnelLeakageStats(leakageStatsData);
+
+      // Fetch other analytics data in parallel
+      const [velocity, heatmap, warnings] = await Promise.allSettled([
         db.analytics.getStageVelocity(funnelId),
         db.analytics.getHeatmapAnalytics("all", funnelId),
         db.analytics.getBottleneckWarnings(funnelId)
       ]);
-
-      // Process leakage stats
-      if (leakage.status === "fulfilled" && leakage.value) {
-        setLeakageStats(leakage.value);
-      }
 
       // Process stage velocity
       if (velocity.status === "fulfilled" && Array.isArray(velocity.value)) {
@@ -209,14 +226,7 @@ export default function AnalyticsReportPage() {
       })
     : [];
 
-  // Default leakage stats if not available
-  const displayLeakageStats = leakageStats || {
-    total_leads: 0,
-    leaked_to_broadcast: 0,
-    leakage_percentage: 0
-  };
-
-  if (loading && !leakageStats) { // Only show full skeleton on initial load
+  if (loading && funnelLeakageStats.length === 0) { // Only show full skeleton on initial load
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
         <div className="max-w-7xl mx-auto">
@@ -239,7 +249,7 @@ export default function AnalyticsReportPage() {
     );
   }
 
-  if (error && !leakageStats) {
+  if (error && funnelLeakageStats.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
         <div className="max-w-7xl mx-auto">
@@ -413,7 +423,16 @@ export default function AnalyticsReportPage() {
 
         {/* Funnel Health Cards */}
         <section>
-          <FunnelHealthCards leakageStats={displayLeakageStats} />
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+              <Activity className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Funnel Health Overview</h2>
+              <p className="text-sm text-gray-600">Individual performance metrics for each funnel</p>
+            </div>
+          </div>
+          <FunnelHealthCards funnelStats={funnelLeakageStats} />
         </section>
 
         <Separator className="my-8" />
