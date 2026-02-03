@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { db } from "@/lib/supabase";
 import { brandService } from "@/services/brandService";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep, FunnelPerformanceComparison, AutoLostLeadStats } from "@/types/analytics";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep, FunnelPerformanceComparison } from "@/types/analytics";
 import { Brand, Funnel } from "@/types/brand";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight, UserX } from "lucide-react";
+import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight } from "lucide-react";
 import { TrendingDown, Clock, AlertTriangle, Activity } from "lucide-react";
 
 // Type definitions for chart data
@@ -50,7 +50,6 @@ export default function AnalyticsReportPage() {
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
   const [funnelComparison, setFunnelComparison] = useState<FunnelPerformanceComparison[]>([]);
-  const [autoLostStats, setAutoLostStats] = useState<AutoLostLeadStats[]>([]);
 
   useEffect(() => {
     // Check authentication
@@ -106,16 +105,8 @@ export default function AnalyticsReportPage() {
       const comparison = await db.analytics.getFunnelPerformanceComparison(brandId);
       setFunnelComparison(comparison || []);
 
-      // Trigger auto-lost check (background)
-      db.analytics.markStaleBroadcastLeadsAsLost().then((result) => {
-        if (result.length > 0) {
-          console.log(`Auto-marked ${result.length} stale broadcast leads as lost`);
-        }
-      });
-
       // Load analytics data using fresh brandFunnels
       await loadAnalyticsDataForFunnels(brandFunnels, undefined);
-      await loadAutoLostStats(undefined);
     } catch (err) {
       console.error("Error loading funnels:", err);
       setError("Failed to load funnels.");
@@ -129,7 +120,6 @@ export default function AnalyticsReportPage() {
     if (selectedBrandId && funnels.length > 0) {
       const funnelIdToUse = selectedFunnelId === "all" ? undefined : selectedFunnelId;
       loadAnalyticsDataForFunnels(funnels, funnelIdToUse);
-      loadAutoLostStats(funnelIdToUse);
     }
   }, [selectedFunnelId]);
 
@@ -143,11 +133,7 @@ export default function AnalyticsReportPage() {
       setStageVelocity([]);
       setHeatmapData([]);
       setBottleneckWarnings([]);
-      setAutoLostStats([]);
       
-      // Load auto-lost stats
-      await loadAutoLostStats(funnelId);
-
       // Fetch leakage stats for each funnel in the brand
       let leakageStatsData: Array<FunnelLeakageStats & { funnel_name: string }> = [];
       
@@ -198,16 +184,6 @@ export default function AnalyticsReportPage() {
       setError("Failed to load analytics data. Please try again.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadAutoLostStats = async (funnelId?: string) => {
-    try {
-      const stats = await db.analytics.getAutoLostLeadsStats(funnelId);
-      setAutoLostStats(stats || []);
-    } catch (error) {
-      console.error("Error loading auto-lost stats:", error);
-      setAutoLostStats([]); // Clear on error
     }
   };
 
@@ -329,46 +305,6 @@ export default function AnalyticsReportPage() {
             </Select>
           </div>
         </div>
-
-        {/* Auto-Lost Leads Section */}
-        {selectedBrandId && selectedFunnelId !== "all" && autoLostStats.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shadow-lg">
-                <UserX className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Auto-Lost Leads (7+ Days Inactive)</h2>
-                <p className="text-sm text-gray-600">Leads automatically marked as lost from last broadcast stage</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {autoLostStats.map((stat) => (
-                <Card key={stat.funnelId} className="border-red-100 hover:shadow-xl transition-all duration-300 bg-white/90 backdrop-blur">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-bold text-slate-800">{stat.funnelName}</CardTitle>
-                    <CardDescription>Inactive in Last Stage</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <p className="text-3xl font-bold text-red-600">{stat.autoLostCount}</p>
-                        <p className="text-xs text-red-400 font-medium">Leads Lost</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-slate-600">{stat.avgDaysInStage} days</p>
-                        <p className="text-xs text-slate-400">Avg. Inactivity</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            
-            <Separator className="my-8" />
-          </section>
-        )}
 
         {/* Funnel Performance Comparison (Only when 'All Funnels' is selected) */}
         {selectedFunnelId === "all" && funnelComparison.length > 0 && (
