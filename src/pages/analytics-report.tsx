@@ -75,7 +75,7 @@ export default function AnalyticsReportPage() {
         setSelectedBrandId(allBrands[0].id);
       } else {
         // Fallback to loading data without brand filter if no brands exist
-        loadAnalyticsData();
+        loadAnalyticsDataForFunnels([], undefined);
       }
     } catch (err) {
       console.error("Error loading brands:", err);
