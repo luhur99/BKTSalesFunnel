@@ -4,13 +4,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { db } from "@/lib/supabase";
 import { FunnelFlowStep } from "@/types/analytics";
 
-export function FollowUpFunnelFlow() {
+interface FollowUpFunnelFlowProps {
+  flowData?: FunnelFlowStep[];
+}
+
+export function FollowUpFunnelFlow({ flowData }: FollowUpFunnelFlowProps) {
   const [steps, setSteps] = useState<FunnelFlowStep[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadFunnelFlow();
-  }, []);
+    // If flowData is provided via props, use it
+    if (flowData) {
+      setSteps(flowData);
+      setLoading(false);
+    } else {
+      // Fallback to internal loading if no props provided
+      loadFunnelFlow();
+    }
+  }, [flowData]);
 
   const loadFunnelFlow = async () => {
     setLoading(true);

@@ -986,6 +986,10 @@ export const db = {
     },
 
     // NEW: Follow-Up Funnel Flow
+    getFunnelFlowData: async (funnelId?: string): Promise<FunnelFlowStep[]> => {
+      return db.analytics.getFollowUpFunnelFlow(funnelId);
+    },
+
     getFollowUpFunnelFlow: async (funnelId?: string): Promise<FunnelFlowStep[]> => {
       if (!isConnected) {
         // Mock data for offline mode
@@ -1699,3 +1703,6 @@ export const db = {
     }
   }
 };
+
+// Add getFunnelFlowData method alias to analytics object
+db.analytics.getFunnelFlowData = db.analytics.getFollowUpFunnelFlow;
