@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { db } from "@/lib/supabase";
 import { brandService } from "@/services/brandService";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, VelocityChartData, HeatmapCell, FunnelPerformanceComparison } from "@/types/analytics";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep, FunnelPerformanceComparison, AutoLostLeadStats } from "@/types/analytics";
 import { Brand, Funnel } from "@/types/brand";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
@@ -17,11 +17,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, TrendingUp, Filter, BarChart3, ArrowRight, UserX } from "lucide-react";
-import { AutoLostLeadStats } from "@/types/analytics";
+import { TrendingDown, Clock, AlertTriangle, Activity } from "lucide-react";
 
 export default function AnalyticsReportPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Filter States
@@ -119,7 +119,7 @@ export default function AnalyticsReportPage() {
       setLoading(true);
       setError(null);
       
-      // Load Auto Lost Stats specifically
+      // Load auto-lost stats
       await loadAutoLostStats(funnelId);
 
       // Fetch all analytics data in parallel with error handling
