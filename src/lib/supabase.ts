@@ -1289,9 +1289,9 @@ export const db = {
           return JSON.parse(stored);
         }
         return [
-          { id: "1", name: "VIP", color: "purple", icon: "star", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          { id: "2", name: "Hot Lead", color: "red", icon: "zap", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-          { id: "3", name: "Follow Up Urgent", color: "orange", icon: "flag", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { id: "1", name: "VIP", color: "purple", icon: "star", funnel_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { id: "2", name: "Hot Lead", color: "red", icon: "zap", funnel_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+          { id: "3", name: "Follow Up Urgent", color: "orange", icon: "flag", funnel_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         ];
       }
       const { data, error } = await supabase
@@ -1302,7 +1302,27 @@ export const db = {
       return data;
     },
 
-    create: async (labelData: { name: string; color: string; icon: string }) => {
+    getByFunnel: async (funnelId: string) => {
+      // Hybrid query: Get global labels (funnel_id = NULL) + funnel-specific labels
+      if (!isConnected) {
+        const stored = localStorage.getItem("customLabels");
+        if (stored) {
+          return JSON.parse(stored);
+        }
+        return [];
+      }
+      
+      const { data, error } = await supabase
+        .from("custom_labels")
+        .select("*")
+        .or(`funnel_id.is.null,funnel_id.eq.${funnelId}`)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+
+    create: async (labelData: { name: string; color: string; icon: string; funnel_id?: string | null }) => {
       if (!isConnected) {
         const stored = localStorage.getItem("customLabels");
         const labels = stored ? JSON.parse(stored) : [];
@@ -1325,7 +1345,7 @@ export const db = {
       return data;
     },
 
-    update: async (labelId: string, labelData: { name?: string; color?: string; icon?: string }) => {
+    update: async (labelId: string, labelData: { name?: string; color?: string; icon?: string; funnel_id?: string | null }) => {
       if (!isConnected) {
         const stored = localStorage.getItem("customLabels");
         if (stored) {

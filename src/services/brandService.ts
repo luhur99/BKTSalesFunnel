@@ -298,6 +298,40 @@ export async function createFunnel(input: CreateFunnelInput): Promise<Funnel> {
     .single();
 
   if (error) throw error;
+  
+  // Auto-copy templates (stages, scripts, labels) to new funnel
+  const funnelId = data.id;
+  
+  // 1. Copy global stages (funnel_id = NULL) to this funnel
+  const { error: stagesCopyError } = await supabase.rpc("copy_global_stages_to_funnel", {
+    target_funnel_id: funnelId
+  });
+  
+  if (stagesCopyError) {
+    console.error("Error copying stages:", stagesCopyError);
+    // Don't throw, continue with funnel creation
+  }
+  
+  // 2. Copy global labels to this funnel
+  const { error: labelsCopyError } = await supabase.rpc("copy_global_labels_to_funnel", {
+    target_funnel_id: funnelId
+  });
+  
+  if (labelsCopyError) {
+    console.error("Error copying labels:", labelsCopyError);
+    // Don't throw, continue with funnel creation
+  }
+  
+  // 3. Copy scripts from global stages to funnel stages
+  const { error: scriptsCopyError } = await supabase.rpc("copy_global_scripts_to_funnel", {
+    target_funnel_id: funnelId
+  });
+  
+  if (scriptsCopyError) {
+    console.error("Error copying scripts:", scriptsCopyError);
+    // Don't throw, continue with funnel creation
+  }
+  
   return data as Funnel;
 }
 

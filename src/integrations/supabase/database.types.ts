@@ -63,6 +63,7 @@ export type Database = {
         Row: {
           color: string
           created_at: string | null
+          funnel_id: string | null
           icon: string
           id: string
           name: string
@@ -71,6 +72,7 @@ export type Database = {
         Insert: {
           color: string
           created_at?: string | null
+          funnel_id?: string | null
           icon: string
           id?: string
           name: string
@@ -79,12 +81,28 @@ export type Database = {
         Update: {
           color?: string
           created_at?: string | null
+          funnel_id?: string | null
           icon?: string
           id?: string
           name?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "custom_labels_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_labels_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       funnels: {
         Row: {
@@ -564,6 +582,18 @@ export type Database = {
       }
     }
     Functions: {
+      copy_global_labels_to_funnel: {
+        Args: { target_funnel_id: string }
+        Returns: undefined
+      }
+      copy_global_scripts_to_funnel: {
+        Args: { target_funnel_id: string }
+        Returns: undefined
+      }
+      copy_global_stages_to_funnel: {
+        Args: { target_funnel_id: string }
+        Returns: undefined
+      }
       get_auto_lost_leads_stats: {
         Args: { p_days?: number; p_funnel_id?: string }
         Returns: {
