@@ -616,8 +616,26 @@ export const db = {
         console.log("✅ Lead updated successfully:", updatedLead);
         console.log("🎉 moveToStage - Operation completed successfully!");
         
-        // Return updated lead data for immediate UI update
-        return updatedLead;
+        // Fetch complete lead data with relations for UI
+        const { data: completeLeadData, error: fetchError } = await supabase
+          .from("leads")
+          .select(`
+            *,
+            source:lead_sources(*),
+            current_stage:stages(*)
+          `)
+          .eq("id", leadId)
+          .single();
+        
+        if (fetchError) {
+          console.error("⚠️ Warning: Could not fetch complete lead data:", fetchError);
+          return updatedLead; // Return basic data if fetch fails
+        }
+        
+        console.log("✅ Complete lead data fetched:", completeLeadData);
+        
+        // Return complete lead data for immediate UI update
+        return completeLeadData;
 
       } catch (error) {
         console.error("❌ moveToStage - Fatal error:", error);

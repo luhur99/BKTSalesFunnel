@@ -102,7 +102,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       console.log("📊 Reason: manual_move");
       console.log("📊 Notes:", moveNotes);
       
-      // CRITICAL: Wait for moveToStage to complete and return updated lead
+      // CRITICAL: Wait for moveToStage to complete and return updated lead with relations
       const updatedLead = await db.leads.moveToStage(lead.id, moveToStage, "manual_move", moveNotes, "Sales User");
       
       console.log("✅ MOVE STAGE - Success! Updated lead:", updatedLead);
@@ -110,15 +110,13 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       setMoveToStage("");
       setMoveNotes("");
       
-      // CRITICAL FIX: Call onUpdate first and wait for parent refresh
+      // CRITICAL FIX: Call onUpdate to refresh parent component
       console.log("🔄 Triggering parent refresh...");
-      onUpdate(); // Refresh parent (dashboard/kanban)
+      onUpdate();
       
-      // Wait 300ms for parent state updates to propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      // Close modal after successful move
       console.log("🔄 Closing modal...");
-      onClose(); // Close modal after parent refreshed
+      onClose();
       
     } catch (error: any) {
       console.error("❌ MOVE STAGE - Error:", error);
@@ -182,11 +180,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       console.log("🔄 Triggering parent refresh...");
       onUpdate();
       
-      // Wait for state updates before closing
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       console.log("🔄 Closing modal...");
-      onClose(); // Close modal to force refresh
+      onClose();
     } catch (error) {
       console.error("Error moving to broadcast:", error);
       alert("❌ Gagal memindahkan lead ke Broadcast. Silakan coba lagi.");
@@ -217,11 +212,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       console.log("🔄 Triggering parent refresh...");
       onUpdate();
       
-      // Wait for state updates before closing
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       console.log("🔄 Closing modal...");
-      onClose(); // Close modal to force refresh
+      onClose();
     } catch (error) {
       console.error("Error moving to follow up:", error);
       alert("❌ Gagal memindahkan lead ke Follow Up. Silakan coba lagi.");
