@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Mail, Building2, Clock, MessageSquare } from "lucide-react";
@@ -25,6 +25,7 @@ interface LeadKanbanProps {
   funnelId?: string;
   stages: Stage[];
   onLeadClick?: (lead: Lead) => void;
+  onLeadsUpdated?: () => void;
 }
 
 interface DraggableLeadCardProps {
@@ -58,7 +59,6 @@ function DraggableLeadCard({ lead, onClick }: DraggableLeadCardProps) {
       {...attributes}
       className="cursor-grab hover:shadow-lg transition-all hover:-translate-y-1 border-slate-200 active:cursor-grabbing"
       onClick={(e) => {
-        // Prevent click during drag
         if (!isDragging) {
           onClick();
         }
@@ -171,32 +171,24 @@ function DroppableStageColumn({ stage, leads, onLeadClick }: DroppableStageColum
   );
 }
 
-export default function LeadKanban({ leads, funnelType, stages, onLeadClick }: LeadKanbanProps) {
+export default function LeadKanban({ leads, funnelType, stages, onLeadClick, onLeadsUpdated }: LeadKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [localLeads, setLocalLeads] = useState<Lead[]>(leads);
   const { toast } = useToast();
 
-  // Update local leads when props change
-  useEffect(() => {
-    setLocalLeads(leads);
-  }, [leads]);
-
-  // Configure sensors for drag detection
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // 8px of movement required to start drag
+        distance: 8,
       },
     })
   );
 
-  // Filter stages by funnel type
   const filteredStages = funnelType
     ? stages.filter(s => s.funnel_type === funnelType)
     : stages;
 
   const getLeadsByStage = (stageId: string) => {
-    return localLeads.filter(lead => lead.current_stage_id === stageId);
+    return leads.filter(lead => lead.current_stage_id === stageId);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -211,39 +203,31 @@ export default function LeadKanban({ leads, funnelType, stages, onLeadClick }: L
 
     const leadId = active.id as string;
     const newStageId = over.id as string;
-    const lead = localLeads.find(l => l.id === leadId);
+    const lead = leads.find(l => l.id === leadId);
     const newStage = filteredStages.find(s => s.id === newStageId);
 
     if (!lead || !newStage || lead.current_stage_id === newStageId) {
       return;
     }
 
-    // Optimistic update
-    const previousLeads = [...localLeads];
-    setLocalLeads(prev =>
-      prev.map(l =>
-        l.id === leadId
-          ? { ...l, current_stage_id: newStageId, updated_at: new Date().toISOString() }
-          : l
-      )
-    );
-
     try {
-      // Instant save to database
+      console.log("🔄 Kanban: Moving lead via drag & drop");
       await db.leads.update(leadId, {
         current_stage_id: newStageId,
       });
 
-      // Show success toast
       toast({
         title: "Lead Moved",
         description: `${lead.name} moved to ${newStage.stage_name}`,
       });
+
+      // Trigger parent refresh
+      if (onLeadsUpdated) {
+        console.log("🔄 Kanban: Calling onLeadsUpdated callback");
+        onLeadsUpdated();
+      }
     } catch (error) {
-      console.error("Error moving lead:", error);
-      
-      // Rollback on error
-      setLocalLeads(previousLeads);
+      console.error("❌ Kanban: Error moving lead:", error);
       
       toast({
         variant: "destructive",
@@ -259,7 +243,7 @@ export default function LeadKanban({ leads, funnelType, stages, onLeadClick }: L
     }
   };
 
-  const activeLead = activeId ? localLeads.find(l => l.id === activeId) : null;
+  const activeLead = activeId ? leads.find(l => l.id === activeId) : null;
 
   return (
     <DndContext

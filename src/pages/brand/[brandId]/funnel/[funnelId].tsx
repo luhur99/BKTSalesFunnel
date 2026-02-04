@@ -440,6 +440,7 @@ export default function FunnelViewPage() {
                 funnelId={funnelId as string}
                 stages={funnelStages}
                 onLeadClick={(lead) => setDetailLeadId(lead.id)}
+                onLeadsUpdated={handleLeadUpdated}
               />
             ) : (
               <LeadListView
