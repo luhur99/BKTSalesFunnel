@@ -102,19 +102,20 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       console.log("📊 Reason: manual_move");
       console.log("📊 Notes:", moveNotes);
       
-      await db.leads.moveToStage(lead.id, moveToStage, "manual_move", moveNotes, "Sales User");
+      // CRITICAL: Wait for moveToStage to complete and return updated lead
+      const updatedLead = await db.leads.moveToStage(lead.id, moveToStage, "manual_move", moveNotes, "Sales User");
       
-      console.log("✅ MOVE STAGE - Success!");
+      console.log("✅ MOVE STAGE - Success! Updated lead:", updatedLead);
       
       setMoveToStage("");
       setMoveNotes("");
       
       // CRITICAL FIX: Call onUpdate first and wait for parent refresh
-      console.log("🔄 Refreshing parent dashboard...");
+      console.log("🔄 Triggering parent refresh...");
       onUpdate(); // Refresh parent (dashboard/kanban)
       
-      // Wait 500ms for parent state updates to propagate
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait 300ms for parent state updates to propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       console.log("🔄 Closing modal...");
       onClose(); // Close modal after parent refreshed
@@ -167,7 +168,9 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
     try {
       setIsSubmitting(true);
-      await db.leads.moveToStage(
+      
+      console.log("🔄 Moving to broadcast funnel...");
+      const updatedLead = await db.leads.moveToStage(
         lead.id,
         broadcastStages[0].id,
         "no_response",
@@ -175,11 +178,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       
-      console.log("🔄 Refreshing parent dashboard...");
+      console.log("✅ Moved to broadcast:", updatedLead);
+      console.log("🔄 Triggering parent refresh...");
       onUpdate();
       
       // Wait for state updates before closing
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       console.log("🔄 Closing modal...");
       onClose(); // Close modal to force refresh
@@ -199,7 +203,9 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
     try {
       setIsSubmitting(true);
-      await db.leads.moveToStage(
+      
+      console.log("🔄 Moving back to follow up funnel...");
+      const updatedLead = await db.leads.moveToStage(
         lead.id,
         followUpStages[0].id,
         "responded",
@@ -207,11 +213,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         "Sales User"
       );
       
-      console.log("🔄 Refreshing parent dashboard...");
+      console.log("✅ Moved to follow up:", updatedLead);
+      console.log("🔄 Triggering parent refresh...");
       onUpdate();
       
       // Wait for state updates before closing
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       console.log("🔄 Closing modal...");
       onClose(); // Close modal to force refresh

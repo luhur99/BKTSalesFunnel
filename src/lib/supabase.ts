@@ -595,24 +595,29 @@ export const db = {
         
         console.log("✅ History record created:", historyData);
 
-        // Step 5: Update lead with new stage
-        console.log("🔍 STEP 5: Updating lead...");
-        const { error: updateError } = await supabase
+        // Step 5: Update lead with new stage AND funnel type
+        console.log("🔍 STEP 5: Updating lead with new stage and funnel...");
+        const { data: updatedLead, error: updateError } = await supabase
           .from("leads")
           .update({
             current_stage_id: toStageId,
             current_funnel: toStage.funnel_type,
             updated_at: movedAt
           })
-          .eq("id", leadId);
+          .eq("id", leadId)
+          .select()
+          .single();
         
         if (updateError) {
           console.error("❌ Error updating lead:", updateError);
           throw new Error(`Failed to update lead: ${updateError.message}`);
         }
         
-        console.log("✅ Lead updated successfully");
+        console.log("✅ Lead updated successfully:", updatedLead);
         console.log("🎉 moveToStage - Operation completed successfully!");
+        
+        // Return updated lead data for immediate UI update
+        return updatedLead;
 
       } catch (error) {
         console.error("❌ moveToStage - Fatal error:", error);

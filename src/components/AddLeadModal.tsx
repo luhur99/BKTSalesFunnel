@@ -60,18 +60,23 @@ export default function AddLeadModal({
       // Use defaultFunnelId from props if available
       const funnelId = defaultFunnelId;
       
-      const [brandsData, sourcesData, labelsData] = await Promise.all([
+      const [brandsData, sourcesData, labelsData, stagesData] = await Promise.all([
         getBrands(),
         db.sources.getAll(),
         // Fetch hybrid labels: global + funnel-specific (if funnel selected)
         funnelId 
           ? db.labels.getByFunnel(funnelId)
-          : db.labels.getAll()
+          : db.labels.getAll(),
+        // Fetch stages for the funnel
+        funnelId
+          ? db.stages.getByFunnel(funnelId)
+          : db.stages.getAll()
       ]);
 
       setBrands(brandsData);
       setSources(sourcesData); // Fix: use setSources not setLeadSources
       setCustomLabels(labelsData);
+      setStages(stagesData || []); // Add stages data
     } catch (error) {
       console.error("Error loading initial data:", error);
     }
@@ -81,8 +86,10 @@ export default function AddLeadModal({
   useEffect(() => {
     if (defaultFunnelId) {
       loadLabelsForFunnel(defaultFunnelId);
+      loadStagesForFunnel(defaultFunnelId);
     } else {
       loadLabelsForFunnel(undefined);
+      loadStagesForFunnel(undefined);
     }
   }, [defaultFunnelId]);
 
@@ -94,6 +101,17 @@ export default function AddLeadModal({
       setCustomLabels(labelsData);
     } catch (error) {
       console.error("Error loading labels:", error);
+    }
+  };
+
+  const loadStagesForFunnel = async (funnelId?: string) => {
+    try {
+      const stagesData = funnelId 
+        ? await db.stages.getByFunnel(funnelId)
+        : await db.stages.getAll();
+      setStages(stagesData || []);
+    } catch (error) {
+      console.error("Error loading stages:", error);
     }
   };
 
