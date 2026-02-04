@@ -44,6 +44,7 @@ export default function FunnelViewPage() {
   const [isEditFunnelOpen, setIsEditFunnelOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailLeadId, setDetailLeadId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Load initial data
   useEffect(() => {
@@ -225,6 +226,7 @@ export default function FunnelViewPage() {
         
         // Force state update
         setLeads(updatedLeads);
+        setRefreshKey(prev => prev + 1);
         console.log("✅ Leads state updated successfully");
         
         // Also reload funnel data to update counts
