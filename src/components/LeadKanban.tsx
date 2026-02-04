@@ -183,23 +183,39 @@ export default function LeadKanban({ leads, funnelType, stages, onLeadClick, onL
     })
   );
 
+  console.log("🎨 LeadKanban Render:", {
+    totalLeads: leads.length,
+    funnelType,
+    totalStages: stages.length,
+    leadsPerStage: stages.map(s => ({
+      stage: s.stage_name,
+      count: leads.filter(l => l.current_stage_id === s.id).length
+    }))
+  });
+
   const filteredStages = funnelType
     ? stages.filter(s => s.funnel_type === funnelType)
     : stages;
 
   const getLeadsByStage = (stageId: string) => {
-    return leads.filter(lead => lead.current_stage_id === stageId);
+    const stageLeads = leads.filter(lead => lead.current_stage_id === stageId);
+    console.log(`📋 Stage ${stageId}: ${stageLeads.length} leads`);
+    return stageLeads;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
+    console.log("🎯 Drag started:", event.active.id);
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
-    if (!over) return;
+    if (!over) {
+      console.log("❌ No drop target");
+      return;
+    }
 
     const leadId = active.id as string;
     const newStageId = over.id as string;
@@ -207,14 +223,24 @@ export default function LeadKanban({ leads, funnelType, stages, onLeadClick, onL
     const newStage = filteredStages.find(s => s.id === newStageId);
 
     if (!lead || !newStage || lead.current_stage_id === newStageId) {
+      console.log("⚠️ Invalid move or same stage");
       return;
     }
 
+    console.log("🔄 Kanban: Moving lead via drag & drop", {
+      leadId,
+      from: lead.current_stage_id,
+      to: newStageId,
+      leadName: lead.name,
+      newStageName: newStage.stage_name
+    });
+
     try {
-      console.log("🔄 Kanban: Moving lead via drag & drop");
       await db.leads.update(leadId, {
         current_stage_id: newStageId,
       });
+
+      console.log("✅ Kanban: Lead moved in database");
 
       toast({
         title: "Lead Moved",
@@ -224,7 +250,7 @@ export default function LeadKanban({ leads, funnelType, stages, onLeadClick, onL
       // Trigger parent refresh
       if (onLeadsUpdated) {
         console.log("🔄 Kanban: Calling onLeadsUpdated callback");
-        onLeadsUpdated();
+        await onLeadsUpdated();
       }
     } catch (error) {
       console.error("❌ Kanban: Error moving lead:", error);
@@ -238,6 +264,7 @@ export default function LeadKanban({ leads, funnelType, stages, onLeadClick, onL
   };
 
   const handleLeadClick = (lead: Lead) => {
+    console.log("👆 Lead clicked:", lead.name);
     if (onLeadClick) {
       onLeadClick(lead);
     }
