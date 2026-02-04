@@ -31,6 +31,16 @@ export interface StageScript {
   updated_at: string;
 }
 
+export interface CustomLabel {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  funnel_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Lead {
   id: string;
   name: string | null; // Name is now optional

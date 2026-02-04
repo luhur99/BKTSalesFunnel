@@ -7,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/supabase";
-import { LeadSource, Stage } from "@/types/lead";
+import { LeadSource, Stage, CustomLabel } from "@/types/lead";
 import { Loader2, X, Tag, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
+import { getBrands } from "@/services/brandService";
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -26,12 +28,14 @@ export default function AddLeadModal({
   defaultBrandId,
   defaultFunnelId
 }: AddLeadModalProps) {
+  const [brands, setBrands] = useState<any[]>([]); // Add brands state if missing
   const [sources, setSources] = useState<LeadSource[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
   const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [customLabels, setCustomLabels] = useState<CustomLabel[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -48,26 +52,48 @@ export default function AddLeadModal({
   });
 
   useEffect(() => {
-    loadData();
-    setError(null);
+    loadInitialData();
   }, []);
 
-  const loadData = async () => {
+  const loadInitialData = async () => {
     try {
-      // Load sources
-      const sourcesData = await db.sources.getAll();
-      setSources(sourcesData);
+      // Use defaultFunnelId from props if available
+      const funnelId = defaultFunnelId;
       
-      // Load stages
-      const stagesData = await db.stages.getAll();
-      setStages(stagesData);
-      
-      // Load available labels
-      const customLabels = await db.customLabels.getAll();
-      setAvailableLabels(customLabels.map((l: any) => l.name));
+      const [brandsData, sourcesData, labelsData] = await Promise.all([
+        getBrands(),
+        db.sources.getAll(),
+        // Fetch hybrid labels: global + funnel-specific (if funnel selected)
+        funnelId 
+          ? db.labels.getByFunnel(funnelId)
+          : db.labels.getAll()
+      ]);
+
+      setBrands(brandsData);
+      setSources(sourcesData); // Fix: use setSources not setLeadSources
+      setCustomLabels(labelsData);
     } catch (error) {
-      console.error("Error loading data:", error);
-      setError("Gagal memuat data options. Silakan refresh halaman.");
+      console.error("Error loading initial data:", error);
+    }
+  };
+
+  // Reload labels when funnel changes (if funnel selection is added later, for now just rely on defaultFunnelId)
+  useEffect(() => {
+    if (defaultFunnelId) {
+      loadLabelsForFunnel(defaultFunnelId);
+    } else {
+      loadLabelsForFunnel(undefined);
+    }
+  }, [defaultFunnelId]);
+
+  const loadLabelsForFunnel = async (funnelId?: string) => {
+    try {
+      const labelsData = funnelId 
+        ? await db.labels.getByFunnel(funnelId)
+        : await db.labels.getAll();
+      setCustomLabels(labelsData);
+    } catch (error) {
+      console.error("Error loading labels:", error);
     }
   };
 
@@ -384,53 +410,63 @@ export default function AddLeadModal({
               </div>
 
               <div>
-                <Label className="mb-2 block">Custom Labels</Label>
-                
-                {/* Available Labels Quick Select */}
-                {availableLabels.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 rounded border">
-                    {availableLabels.map((label) => (
-                      <Badge
-                        key={label}
-                        variant={formData.custom_labels.includes(label) ? "default" : "outline"}
-                        className="cursor-pointer hover:bg-primary/90"
-                        onClick={() => handleToggleLabel(label)}
+                <Label>Custom Labels (Optional)</Label>
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
+                  {customLabels.map((label) => {
+                    // Check if label is selected using formData.custom_labels
+                    const isSelected = formData.custom_labels.includes(label.id);
+                    const isGlobal = !label.funnel_id;
+                    
+                    return (
+                      <div
+                        key={label.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            // Remove label
+                            setFormData(prev => ({
+                              ...prev,
+                              custom_labels: prev.custom_labels.filter(id => id !== label.id)
+                            }));
+                          } else {
+                            // Add label
+                            setFormData(prev => ({
+                              ...prev,
+                              custom_labels: [...prev.custom_labels, label.id]
+                            }));
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-all",
+                          "hover:bg-gray-100 border",
+                          isSelected 
+                            ? "bg-blue-50 border-blue-300" 
+                            : "bg-white border-gray-200"
+                        )}
                       >
-                        {label}
-                      </Badge>
-                    ))}
-                  </div>
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: label.color }}
+                        />
+                        <span className="text-sm font-medium flex-1 truncate">
+                          {label.name}
+                        </span>
+                        {isGlobal && (
+                          <Badge 
+                            variant="outline" 
+                            className="text-[10px] px-1 py-0 h-4 bg-gray-100 text-gray-600"
+                          >
+                            Global
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {customLabels.length === 0 && (
+                  <p className="text-xs text-gray-500 text-center py-4">
+                    No labels available. Create labels in Funnel Settings.
+                  </p>
                 )}
-
-                {/* Add New Label */}
-                <div className="flex gap-2 mb-3">
-                  <Input
-                    value={labelInput}
-                    onChange={(e) => setLabelInput(e.target.value)}
-                    placeholder="Tambah label baru..."
-                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddLabel())}
-                  />
-                  <Button type="button" onClick={handleAddLabel} variant="secondary">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Selected Labels Display */}
-                <div className="flex flex-wrap gap-2">
-                  {formData.custom_labels.map((label) => (
-                    <Badge key={label} variant="secondary" className="gap-1 pl-2">
-                      <Tag className="h-3 w-3" />
-                      {label}
-                      <button 
-                        type="button" 
-                        onClick={() => handleRemoveLabel(label)}
-                        className="hover:text-red-500 ml-1"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
               </div>
 
               <div>
