@@ -229,7 +229,7 @@ export function CustomLabelsTab({ funnelId, onUpdate }: CustomLabelsTabProps) {
                     {label.name}
                   </span>
                 </div>
-                <Lock className="w-3 h-3 text-gray-400" title="Global label (cannot delete from here)" />
+                <Lock className="w-3 h-3 text-gray-400" />
               </div>
             ))}
             {globalLabels.length === 0 && (

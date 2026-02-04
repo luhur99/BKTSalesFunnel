@@ -1754,6 +1754,11 @@ export const db = {
         
       return [];
     }
+  },
+
+  // Alias for customLabels to maintain compatibility
+  get labels() {
+    return this.customLabels;
   }
 };
 
