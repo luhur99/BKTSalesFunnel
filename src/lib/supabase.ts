@@ -18,18 +18,18 @@ const MOCK_SOURCES: LeadSource[] = [
 ];
 
 const MOCK_FOLLOW_UP_STAGES: Stage[] = [
-  { id: "stage-fu-1", stage_name: "New Lead", stage_number: 1, funnel_type: "follow_up", description: "Lead baru masuk", created_at: new Date().toISOString() },
-  { id: "stage-fu-2", stage_name: "Contacted", stage_number: 2, funnel_type: "follow_up", description: "Sudah dihubungi", created_at: new Date().toISOString() },
-  { id: "stage-fu-3", stage_name: "Interest", stage_number: 3, funnel_type: "follow_up", description: "Tertarik produk", created_at: new Date().toISOString() },
-  { id: "stage-fu-4", stage_name: "Negotiation", stage_number: 4, funnel_type: "follow_up", description: "Negosiasi harga", created_at: new Date().toISOString() },
-  { id: "stage-fu-5", stage_name: "Closing", stage_number: 5, funnel_type: "follow_up", description: "Menunggu pembayaran", created_at: new Date().toISOString() },
+  { id: "stage-fu-1", stage_name: "New Lead", stage_number: 1, funnel_type: "follow_up", description: "Lead baru masuk", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-fu-2", stage_name: "Contacted", stage_number: 2, funnel_type: "follow_up", description: "Sudah dihubungi", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-fu-3", stage_name: "Interest", stage_number: 3, funnel_type: "follow_up", description: "Tertarik produk", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-fu-4", stage_name: "Negotiation", stage_number: 4, funnel_type: "follow_up", description: "Negosiasi harga", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-fu-5", stage_name: "Closing", stage_number: 5, funnel_type: "follow_up", description: "Menunggu pembayaran", funnel_id: null, created_at: new Date().toISOString() },
 ];
 
 const MOCK_BROADCAST_STAGES: Stage[] = [
-  { id: "stage-bc-1", stage_name: "No Response 1", stage_number: 1, funnel_type: "broadcast", description: "Broadcast ke-1", created_at: new Date().toISOString() },
-  { id: "stage-bc-2", stage_name: "No Response 2", stage_number: 2, funnel_type: "broadcast", description: "Broadcast ke-2", created_at: new Date().toISOString() },
-  { id: "stage-bc-3", stage_name: "No Response 3", stage_number: 3, funnel_type: "broadcast", description: "Broadcast ke-3", created_at: new Date().toISOString() },
-  { id: "stage-bc-4", stage_name: "Final Attempt", stage_number: 4, funnel_type: "broadcast", description: "Broadcast terakhir", created_at: new Date().toISOString() },
+  { id: "stage-bc-1", stage_name: "No Response 1", stage_number: 1, funnel_type: "broadcast", description: "Broadcast ke-1", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-bc-2", stage_name: "No Response 2", stage_number: 2, funnel_type: "broadcast", description: "Broadcast ke-2", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-bc-3", stage_name: "No Response 3", stage_number: 3, funnel_type: "broadcast", description: "Broadcast ke-3", funnel_id: null, created_at: new Date().toISOString() },
+  { id: "stage-bc-4", stage_name: "Final Attempt", stage_number: 4, funnel_type: "broadcast", description: "Broadcast terakhir", funnel_id: null, created_at: new Date().toISOString() },
 ];
 
 const MOCK_LEADS: Lead[] = [
@@ -138,85 +138,97 @@ export const db = {
   },
 
   stages: {
-    getAll: async () => {
-      if (!isConnected) return [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES];
-      const { data, error } = await supabase.from("stages").select("*").order("stage_number");
-      if (error) throw error;
-      return data;
-    },
-    getByFunnel: async (funnel: FunnelType) => {
-      if (!isConnected) {
-        return funnel === "follow_up" ? MOCK_FOLLOW_UP_STAGES : MOCK_BROADCAST_STAGES;
-      }
+    async getByFunnel(funnelId: string): Promise<Stage[]> {
+      // Get funnel-specific stages OR global templates (funnel_id IS NULL)
       const { data, error } = await supabase
         .from("stages")
         .select("*")
-        .eq("funnel_type", funnel)
-        .order("stage_number");
-      if (error) throw error;
-      return data;
-    },
-    create: async (stageData: { name: string; description?: string; funnel_type: FunnelType; order: number }) => {
-      if (!isConnected) {
-        const newStage: Stage = {
-          id: `stage-${Date.now()}`,
-          stage_name: stageData.name,
-          stage_number: stageData.order,
-          funnel_type: stageData.funnel_type,
-          description: stageData.description || null,
-          created_at: new Date().toISOString()
-        };
-        if (stageData.funnel_type === "follow_up") {
-          MOCK_FOLLOW_UP_STAGES.push(newStage);
-        } else {
-          MOCK_BROADCAST_STAGES.push(newStage);
-        }
-        return newStage;
+        .or(`funnel_id.eq.${funnelId},funnel_id.is.null`)
+        .order("funnel_type", { ascending: true })
+        .order("stage_number", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching stages:", error);
+        throw error;
       }
-      const { data, error } = await supabase.from("stages").insert([{
-        stage_name: stageData.name,
-        stage_number: stageData.order,
-        funnel_type: stageData.funnel_type,
-        description: stageData.description
-      }]).select().single();
-      if (error) throw error;
-      return data;
-    },
-    update: async (stageId: string, stageData: { name?: string; description?: string; order?: number }) => {
-      if (!isConnected) {
-        const allStages = [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES];
-        const index = allStages.findIndex(s => s.id === stageId);
-        if (index !== -1) {
-          if (stageData.name) allStages[index].stage_name = stageData.name;
-          if (stageData.description !== undefined) allStages[index].description = stageData.description || null;
-          if (stageData.order) allStages[index].stage_number = stageData.order;
-        }
-        return allStages[index];
-      }
-      const updateData: any = {};
-      if (stageData.name) updateData.stage_name = stageData.name;
-      if (stageData.description !== undefined) updateData.description = stageData.description;
-      if (stageData.order) updateData.stage_number = stageData.order;
+
+      // Prioritize funnel-specific stages over global templates
+      const stages = data || [];
+      const followUpStages = stages.filter(s => s.funnel_type === "follow_up");
+      const broadcastStages = stages.filter(s => s.funnel_type === "broadcast");
+
+      // For each funnel_type, use funnel-specific if available, otherwise use global templates
+      const result: Stage[] = [];
       
-      const { data, error } = await supabase.from("stages").update(updateData).eq("id", stageId).select().single();
-      if (error) throw error;
+      for (const type of ["follow_up", "broadcast"] as const) {
+        const typeStages = stages.filter(s => s.funnel_type === type);
+        const funnelSpecific = typeStages.filter(s => s.funnel_id === funnelId);
+        const global = typeStages.filter(s => !s.funnel_id);
+        
+        // Use funnel-specific if exists, otherwise fallback to global templates
+        result.push(...(funnelSpecific.length > 0 ? funnelSpecific : global));
+      }
+
+      return result;
+    },
+
+    async getAll(): Promise<Stage[]> {
+      // Get all stages (both global and funnel-specific)
+      const { data, error } = await supabase
+        .from("stages")
+        .select("*")
+        .order("funnel_type", { ascending: true })
+        .order("stage_number", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching stages:", error);
+        throw error;
+      }
+
+      return data || [];
+    },
+
+    async create(stage: Omit<Stage, "id" | "created_at">): Promise<Stage> {
+      const { data, error } = await supabase
+        .from("stages")
+        .insert(stage)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error creating stage:", error);
+        throw error;
+      }
+
       return data;
     },
-    delete: async (stageId: string) => {
-      if (!isConnected) {
-        const fuIndex = MOCK_FOLLOW_UP_STAGES.findIndex(s => s.id === stageId);
-        if (fuIndex !== -1) {
-          MOCK_FOLLOW_UP_STAGES.splice(fuIndex, 1);
-          return;
-        }
-        const bcIndex = MOCK_BROADCAST_STAGES.findIndex(s => s.id === stageId);
-        if (bcIndex !== -1) {
-          MOCK_BROADCAST_STAGES.splice(bcIndex, 1);
-        }
-        return;
+
+    async update(id: string, updates: Partial<Stage>): Promise<Stage> {
+      const { data, error } = await supabase
+        .from("stages")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error updating stage:", error);
+        throw error;
       }
-      const { error } = await supabase.from("stages").delete().eq("id", stageId);
-      if (error) throw error;
+
+      return data;
+    },
+
+    async delete(id: string): Promise<void> {
+      const { error } = await supabase
+        .from("stages")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error deleting stage:", error);
+        throw error;
+      }
     }
   },
 
@@ -263,6 +275,27 @@ export const db = {
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+
+    async getByBrandId(brandId: string): Promise<Lead[]> {
+      const { data, error } = await supabase
+        .from("leads")
+        .select(`
+          *,
+          brand:brands(*),
+          funnel:funnels(*),
+          current_stage:stages(*),
+          lead_activities(*)
+        `)
+        .eq("brand_id", brandId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching leads by brand:", error);
+        throw error;
+      }
+
+      return (data || []) as Lead[];
     },
 
     create: async (leadData: any) => {

@@ -12,10 +12,11 @@ export interface LeadSource {
 
 export interface Stage {
   id: string;
-  funnel_type: FunnelType;
-  stage_number: number;
   stage_name: string;
-  description: string;
+  funnel_type: "follow_up" | "broadcast";
+  stage_number: number;
+  description?: string;
+  funnel_id?: string | null; // NULL = global template, NOT NULL = funnel-specific
   created_at: string;
 }
 

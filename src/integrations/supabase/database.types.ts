@@ -131,6 +131,13 @@ export type Database = {
             referencedRelation: "brands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "funnels_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       lead_activities: {
@@ -272,6 +279,8 @@ export type Database = {
           last_response_note: string | null
           name: string | null
           phone: string
+          pipeline_id: string | null
+          project_id: string | null
           source_id: string | null
           status: Database["public"]["Enums"]["lead_status"] | null
           updated_at: string | null
@@ -291,6 +300,8 @@ export type Database = {
           last_response_note?: string | null
           name?: string | null
           phone: string
+          pipeline_id?: string | null
+          project_id?: string | null
           source_id?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
           updated_at?: string | null
@@ -310,6 +321,8 @@ export type Database = {
           last_response_note?: string | null
           name?: string | null
           phone?: string
+          pipeline_id?: string | null
+          project_id?: string | null
           source_id?: string | null
           status?: Database["public"]["Enums"]["lead_status"] | null
           updated_at?: string | null
@@ -320,6 +333,13 @@ export type Database = {
             columns: ["brand_id"]
             isOneToOne: false
             referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -334,6 +354,13 @@ export type Database = {
             columns: ["funnel_id"]
             isOneToOne: false
             referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
           {
@@ -417,6 +444,7 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
+          funnel_id: string | null
           funnel_type: Database["public"]["Enums"]["funnel_type"]
           id: string
           stage_name: string
@@ -425,6 +453,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description?: string | null
+          funnel_id?: string | null
           funnel_type: Database["public"]["Enums"]["funnel_type"]
           id?: string
           stage_name: string
@@ -433,16 +462,106 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string | null
+          funnel_id?: string | null
           funnel_type?: Database["public"]["Enums"]["funnel_type"]
           id?: string
           stage_name?: string
           stage_number?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stages_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stages_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
-      [_ in never]: never
+      pipelines: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          is_default: boolean | null
+          name: string | null
+          project_id: string | null
+          total_leads_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_default?: boolean | null
+          name?: string | null
+          project_id?: string | null
+          total_leads_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_default?: boolean | null
+          name?: string | null
+          project_id?: string | null
+          total_leads_count?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funnels_brand_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funnels_brand_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          owner_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          owner_id?: never
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          owner_id?: never
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_auto_lost_leads_stats: {
