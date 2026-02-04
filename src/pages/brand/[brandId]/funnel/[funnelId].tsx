@@ -19,6 +19,7 @@ import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { LeadDetailModal } from "@/components/LeadDetailModal";
 import { ManageFunnelStagesDialog } from "@/components/ManageFunnelStagesDialog";
+import { FunnelSettingsDialog } from "@/components/FunnelSettingsDialog";
 
 export default function FunnelViewPage() {
   const router = useRouter();
@@ -40,6 +41,8 @@ export default function FunnelViewPage() {
   const [lostCount, setLostCount] = useState<number>(0);
   const [funnelStages, setFunnelStages] = useState<Stage[]>([]);
   const [isManageStagesOpen, setIsManageStagesOpen] = useState(false);
+  const [isEditFunnelOpen, setIsEditFunnelOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailLeadId, setDetailLeadId] = useState<string | null>(null);
 
   // Load initial data
@@ -272,28 +275,15 @@ export default function FunnelViewPage() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => router.push(`/analytics-report?funnel=${funnelId}`)}
+              onClick={() => setIsSettingsOpen(true)}
             >
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Analytics
+              <Settings className="w-4 h-4 mr-2" />
+              Funnel Settings
             </Button>
-
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => setIsManageStagesOpen(true)}
-              >
-                <Settings className="w-4 h-4" />
-                Manage Stages
-              </Button>
-
-              <Button onClick={openAddLeadModal} size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add Lead
-              </Button>
-            </div>
+            <Button onClick={openAddLeadModal} size="sm" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Lead
+            </Button>
           </div>
         </div>
 
@@ -506,14 +496,10 @@ export default function FunnelViewPage() {
         />
       )}
 
-      <ManageFunnelStagesDialog
-        funnelId={funnelId as string}
-        open={isManageStagesOpen}
-        onOpenChange={setIsManageStagesOpen}
-        onStagesUpdated={() => {
-          loadFunnelStages();
-          loadLeads();
-        }}
+      <FunnelSettingsDialog 
+        funnel={funnel}
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </>
   );
