@@ -102,12 +102,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.email || "System";
       
+      // Get target stage info for better toast message
+      const targetStage = stages.find(s => s.id === moveToStage);
+      const fromStage = lead.current_stage;
+      
       console.log("🔄 Moving lead to stage:", moveToStage);
+      console.log("📊 From:", fromStage?.stage_name, "→ To:", targetStage?.stage_name);
+      
       await db.leads.moveToStage(lead.id, moveToStage, moveReason, moveNotes, userId);
       
       toast({
-        title: "Success",
-        description: "Lead moved to new stage successfully",
+        title: "✅ Lead Berhasil Dipindahkan",
+        description: `${fromStage?.stage_name || 'Stage sebelumnya'} → ${targetStage?.stage_name || 'Stage baru'}`,
       });
       
       // CRITICAL: Call onUpdate and WAIT for it to complete
@@ -186,6 +192,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const userId = user?.email || "System";
 
       console.log("🔄 Moving lead to broadcast funnel, stage:", firstBroadcastStage);
+      console.log("📊 From:", lead.current_stage?.stage_name, "(Follow Up) → To:", firstBroadcastStage.stage_name, "(Broadcast)");
+      
       await db.leads.moveToStage(
         lead.id,
         firstBroadcastStage.id,
@@ -195,8 +203,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       );
 
       toast({
-        title: "Success",
-        description: "Lead moved to Broadcast funnel",
+        title: "✅ Lead Dipindahkan ke Broadcast",
+        description: `${lead.current_stage?.stage_name || 'Stage sebelumnya'} (Follow Up) → ${firstBroadcastStage.stage_name} (Broadcast)`,
       });
 
       // CRITICAL: Call onUpdate and WAIT for it to complete
@@ -246,6 +254,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const userId = user?.email || "System";
 
       console.log("🔄 Moving lead to follow-up funnel, stage:", firstFollowUpStage);
+      console.log("📊 From:", lead.current_stage?.stage_name, "(Broadcast) → To:", firstFollowUpStage.stage_name, "(Follow Up)");
+      
       await db.leads.moveToStage(
         lead.id,
         firstFollowUpStage.id,
@@ -255,8 +265,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       );
 
       toast({
-        title: "Success",
-        description: "Lead moved to Follow Up funnel",
+        title: "✅ Lead Dipindahkan ke Follow Up",
+        description: `${lead.current_stage?.stage_name || 'Stage sebelumnya'} (Broadcast) → ${firstFollowUpStage.stage_name} (Follow Up)`,
       });
 
       // CRITICAL: Call onUpdate and WAIT for it to complete
