@@ -532,10 +532,7 @@ export default function FunnelViewPage() {
           lead={leads.find(l => l.id === detailLeadId) || null}
           isOpen={!!detailLeadId}
           onClose={() => setDetailLeadId(null)}
-          onUpdate={() => {
-            loadLeads();
-            loadFunnel();
-          }}
+          onUpdate={handleLeadUpdated}
         />
       )}
 
