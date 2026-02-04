@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download, Filter, X, Trash2 } from "lucide-react";
+import { Search, Mail, Phone, Building2, Calendar, Edit, Tag, Download, Filter, X, Trash2, Globe } from "lucide-react";
 import { Lead, Stage, FunnelType } from "@/types/lead";
 import { db } from "@/lib/supabase";
 import * as XLSX from "xlsx";

@@ -110,11 +110,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: "Lead moved to new stage successfully",
       });
       
-      // Close modal and trigger refresh
-      onClose();
+      // CRITICAL FIX: Call onUpdate first to refresh parent data
+      console.log("🔄 Calling onUpdate to refresh parent data...");
       if (onUpdate) {
         await onUpdate();
       }
+      
+      // Small delay to ensure state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Then close modal
+      console.log("✅ Closing modal after successful update");
+      onClose();
       
     } catch (error: any) {
       console.error("❌ Error moving lead:", error);
@@ -192,11 +199,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: "Lead moved to Broadcast funnel",
       });
 
-      // Close modal and trigger refresh
-      onClose();
+      // CRITICAL FIX: Call onUpdate first to refresh parent data
+      console.log("🔄 Calling onUpdate to refresh parent data...");
       if (onUpdate) {
         await onUpdate();
       }
+      
+      // Small delay to ensure state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Then close modal
+      console.log("✅ Closing modal after successful update");
+      onClose();
 
     } catch (error: any) {
       console.error("❌ Error moving to broadcast:", error);
@@ -245,11 +259,18 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: "Lead moved to Follow Up funnel",
       });
 
-      // Close modal and trigger refresh
-      onClose();
+      // CRITICAL FIX: Call onUpdate first to refresh parent data
+      console.log("🔄 Calling onUpdate to refresh parent data...");
       if (onUpdate) {
         await onUpdate();
       }
+      
+      // Small delay to ensure state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Then close modal
+      console.log("✅ Closing modal after successful update");
+      onClose();
 
     } catch (error: any) {
       console.error("❌ Error moving to follow-up:", error);

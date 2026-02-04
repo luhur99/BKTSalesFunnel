@@ -209,20 +209,36 @@ export default function FunnelViewPage() {
       try {
         console.log("📊 Fetching fresh leads data for funnel:", funnelId);
         const updatedLeads = await db.leads.getByFunnelId(funnelId);
-        console.log("✅ Fresh leads data:", updatedLeads);
-        console.log("📊 Total leads:", updatedLeads.length);
+        console.log("✅ Fresh leads data received:", updatedLeads.length, "leads");
         
         // Log sample lead to verify data structure
         if (updatedLeads.length > 0) {
-          console.log("🔍 Sample lead data:", updatedLeads[0]);
-          console.log("🔍 Sample source:", updatedLeads[0].source);
-          console.log("🔍 Sample stage:", updatedLeads[0].current_stage);
+          console.log("🔍 Sample lead after refresh:", {
+            id: updatedLeads[0].id,
+            name: updatedLeads[0].name,
+            current_stage_id: updatedLeads[0].current_stage_id,
+            current_stage_name: updatedLeads[0].current_stage?.stage_name,
+            current_funnel: updatedLeads[0].current_funnel,
+            source_name: updatedLeads[0].source?.name
+          });
         }
         
+        // Force state update
         setLeads(updatedLeads);
         console.log("✅ Leads state updated successfully");
+        
+        // Also reload funnel data to update counts
+        console.log("🔄 Reloading funnel data...");
+        await loadFunnel();
+        console.log("✅ Funnel data reloaded");
+        
       } catch (error) {
         console.error("❌ Error refreshing leads:", error);
+        toast({
+          title: "Error",
+          description: "Failed to refresh leads. Please refresh the page.",
+          variant: "destructive",
+        });
       }
     }
   };
