@@ -5,7 +5,7 @@ import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, BarChart3, LayoutGrid, List } from "lucide-react";
+import { ArrowLeft, Plus, BarChart3, LayoutGrid, List, Settings, TrendingUp, Users, Target, Trophy, XCircle } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { getFunnelById } from "@/services/brandService";
 import type { Funnel } from "@/types/brand";
@@ -17,6 +17,8 @@ import AddLeadModal from "@/components/AddLeadModal";
 import { useToast } from "@/hooks/use-toast";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
+import { LeadDetailModal } from "@/components/LeadDetailModal";
+import { ManageFunnelStagesDialog } from "@/components/ManageFunnelStagesDialog";
 
 export default function FunnelViewPage() {
   const router = useRouter();
@@ -36,127 +38,124 @@ export default function FunnelViewPage() {
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [wonCount, setWonCount] = useState<number>(0);
   const [lostCount, setLostCount] = useState<number>(0);
+  const [funnelStages, setFunnelStages] = useState<Stage[]>([]);
+  const [isManageStagesOpen, setIsManageStagesOpen] = useState(false);
+  const [detailLead, setDetailLead] = useState<Lead | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Load initial data
   useEffect(() => {
-    if (!funnelId || typeof funnelId !== "string") return;
-
-    async function loadData() {
-      try {
-        setLoading(true);
-        const [funnelData, stagesData] = await Promise.all([
-          getFunnelById(funnelId as string),
-          db.stages.getAll()
-        ]);
-        setFunnel(funnelData);
-        setStages(stagesData);
-      } catch (error) {
-        console.error("Error loading data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load funnel data",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
+    if (funnelId && typeof funnelId === "string") {
+      loadFunnel();
+      loadLeads();
+      loadFunnelStages();
     }
+  }, [funnelId]);
 
-    loadData();
-  }, [funnelId, toast]);
-
-  // Fetch leads for this funnel
+  // Load analytics data
   useEffect(() => {
     if (!funnelId || typeof funnelId !== "string") return;
-
-    async function loadLeads() {
-      try {
-        setLoading(true);
-        const data = await db.leads.getByFunnelId(funnelId as string);
-        setLeads(data);
-        
-        // Count won and lost leads
-        const won = data.filter(lead => lead.status === 'won').length;
-        const lost = data.filter(lead => lead.status === 'lost').length;
-        setWonCount(won);
-        setLostCount(lost);
-      } catch (error) {
-        console.error("Error loading leads:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load leads",
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadLeads();
-  }, [funnelId, toast]);
-
-  // Load analytics data for this funnel
-  useEffect(() => {
-    if (!funnelId || typeof funnelId !== "string") return;
-
-    async function loadAnalytics() {
-      try {
-        setLoadingAnalytics(true);
-        console.log("📊 Loading analytics for funnel:", funnelId);
-
-        const [velocityResult, heatmapResult] = await Promise.allSettled([
-          db.analytics.getStageVelocity(funnelId as string),
-          db.analytics.getHeatmapAnalytics("all", funnelId as string)
-        ]);
-
-        // Process Velocity Data
-        if (velocityResult.status === "fulfilled" && Array.isArray(velocityResult.value)) {
-          const formattedVelocity: VelocityChartData[] = velocityResult.value.map(item => ({
-            stage: item.stage_name_out,
-            hours: parseFloat(item.avg_hours),
-            leads: item.total_leads_passed
-          }));
-          setVelocityData(formattedVelocity);
-          console.log("✅ Stage velocity loaded:", formattedVelocity.length);
-        }
-
-        // Process Heatmap Data
-        if (heatmapResult.status === "fulfilled" && Array.isArray(heatmapResult.value)) {
-          const rawHeatmap = heatmapResult.value;
-          
-          // Calculate max value for intensity
-          const maxCount = Math.max(...rawHeatmap.map(d => d.count), 1);
-          
-          const formattedHeatmap: HeatmapCell[] = rawHeatmap.map(item => {
-            // Calculate intensity
-            let intensity: "low" | "medium" | "high" | "none" = "none";
-            if (item.count > 0) {
-              const ratio = item.count / maxCount;
-              if (ratio > 0.7) intensity = "high";
-              else if (ratio > 0.3) intensity = "medium";
-              else intensity = "low";
-            }
-
-            return {
-              day: item.day_name,
-              hour: item.hour_of_day,
-              value: item.count,
-              intensity
-            };
-          });
-          
-          setHeatmapData(formattedHeatmap);
-          console.log("✅ Heatmap data loaded:", formattedHeatmap.length);
-        }
-      } catch (error) {
-        console.error("❌ Error loading analytics:", error);
-      } finally {
-        setLoadingAnalytics(false);
-      }
-    }
-
     loadAnalytics();
   }, [funnelId]);
+
+  const loadFunnel = async () => {
+    try {
+      const data = await getFunnelById(funnelId as string);
+      setFunnel(data);
+    } catch (error) {
+      console.error("Error loading funnel:", error);
+    }
+  };
+
+  const loadLeads = async () => {
+    try {
+      setLoading(true);
+      const data = await db.leads.getByFunnelId(funnelId as string);
+      setLeads(data);
+      
+      // Count won and lost leads
+      const won = data.filter(lead => lead.status === "deal").length;
+      const lost = data.filter(lead => lead.status === "lost").length;
+      
+      setWonCount(won);
+      setLostCount(lost);
+    } catch (error) {
+      console.error("Error loading leads:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load leads",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFunnelStages = async () => {
+    try {
+      const stagesData = await db.stages.getByFunnel(funnelId as string);
+      setFunnelStages(stagesData);
+      setStages(stagesData);
+    } catch (error) {
+      console.error("Error loading funnel stages:", error);
+    }
+  };
+
+  const loadAnalytics = async () => {
+    try {
+      setLoadingAnalytics(true);
+      console.log("📊 Loading analytics for funnel:", funnelId);
+
+      const [velocityResult, heatmapResult] = await Promise.allSettled([
+        db.analytics.getStageVelocity(funnelId as string),
+        db.analytics.getHeatmapAnalytics("all", funnelId as string)
+      ]);
+
+      // Process Velocity Data
+      if (velocityResult.status === "fulfilled" && Array.isArray(velocityResult.value)) {
+        const formattedVelocity: VelocityChartData[] = velocityResult.value.map(item => ({
+          stage: item.stage_name_out,
+          hours: parseFloat(item.avg_hours),
+          leads: item.total_leads_passed
+        }));
+        setVelocityData(formattedVelocity);
+        console.log("✅ Stage velocity loaded:", formattedVelocity.length);
+      }
+
+      // Process Heatmap Data
+      if (heatmapResult.status === "fulfilled" && Array.isArray(heatmapResult.value)) {
+        const rawHeatmap = heatmapResult.value;
+        
+        // Calculate max value for intensity
+        const maxCount = Math.max(...rawHeatmap.map(d => d.count), 1);
+        
+        const formattedHeatmap: HeatmapCell[] = rawHeatmap.map(item => {
+          // Calculate intensity
+          let intensity: "low" | "medium" | "high" | "none" = "none";
+          if (item.count > 0) {
+            const ratio = item.count / maxCount;
+            if (ratio > 0.7) intensity = "high";
+            else if (ratio > 0.3) intensity = "medium";
+            else intensity = "low";
+          }
+
+          return {
+            day: item.day_name,
+            hour: item.hour_of_day,
+            value: item.count,
+            intensity
+          };
+        });
+        
+        setHeatmapData(formattedHeatmap);
+        console.log("✅ Heatmap data loaded:", formattedHeatmap.length);
+      }
+    } catch (error) {
+      console.error("❌ Error loading analytics:", error);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
 
   // Filter leads based on active tab
   const filteredLeads = leads.filter((lead) => {
@@ -291,6 +290,10 @@ export default function FunnelViewPage() {
               <BarChart3 className="w-4 h-4 mr-2" />
               Analytics
             </Button>
+            <Button variant="outline" onClick={() => setIsManageStagesOpen(true)}>
+              <Settings className="w-4 h-4 mr-2" />
+              Manage Stages
+            </Button>
             <Button onClick={() => setShowAddModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Add Lead
@@ -327,7 +330,7 @@ export default function FunnelViewPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Won Leads</CardTitle>
-              <BarChart3 className="h-4 w-4 text-green-600" />
+              <Trophy className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{wonCount}</div>
@@ -340,7 +343,7 @@ export default function FunnelViewPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Lost Leads</CardTitle>
-              <BarChart3 className="h-4 w-4 text-red-600" />
+              <XCircle className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{lostCount}</div>
@@ -487,18 +490,42 @@ export default function FunnelViewPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Add Lead Modal */}
-        {showAddModal && (
-          <AddLeadModal
-            isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            onLeadAdded={handleLeadAdded}
-            defaultBrandId={brandId as string}
-            defaultFunnelId={funnelId as string}
-          />
-        )}
       </div>
+
+      {/* Add Lead Modal */}
+      {showAddModal && (
+        <AddLeadModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onLeadAdded={handleLeadAdded}
+          defaultBrandId={brandId as string}
+          defaultFunnelId={funnelId as string}
+        />
+      )}
+
+      {/* Lead Detail Modal */}
+      {isDetailModalOpen && detailLead && (
+        <LeadDetailModal
+          lead={detailLead}
+          isOpen={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setDetailLead(null);
+          }}
+          onUpdate={loadLeads}
+        />
+      )}
+
+      {/* Manage Stages Dialog */}
+      <ManageFunnelStagesDialog
+        open={isManageStagesOpen}
+        onOpenChange={setIsManageStagesOpen}
+        funnelId={funnelId as string}
+        onStagesUpdated={() => {
+          loadFunnelStages();
+          loadLeads();
+        }}
+      />
     </>
   );
 }
