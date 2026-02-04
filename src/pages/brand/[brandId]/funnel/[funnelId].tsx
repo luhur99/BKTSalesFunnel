@@ -431,6 +431,7 @@ export default function FunnelViewPage() {
           <>
             {viewMode === "kanban" ? (
               <LeadKanban
+                key={leads.length}
                 leads={filteredLeads}
                 funnelType={activeTab === "all" ? undefined : activeTab}
                 brandId={brandId as string}
