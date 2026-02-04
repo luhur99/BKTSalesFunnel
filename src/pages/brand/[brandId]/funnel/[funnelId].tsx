@@ -203,6 +203,30 @@ export default function FunnelViewPage() {
     }
   };
 
+  const handleLeadUpdated = async () => {
+    console.log("🔄 handleLeadUpdated called - Refreshing leads...");
+    if (funnelId && typeof funnelId === "string") {
+      try {
+        console.log("📊 Fetching fresh leads data for funnel:", funnelId);
+        const updatedLeads = await db.leads.getByFunnelId(funnelId);
+        console.log("✅ Fresh leads data:", updatedLeads);
+        console.log("📊 Total leads:", updatedLeads.length);
+        
+        // Log sample lead to verify data structure
+        if (updatedLeads.length > 0) {
+          console.log("🔍 Sample lead data:", updatedLeads[0]);
+          console.log("🔍 Sample source:", updatedLeads[0].source);
+          console.log("🔍 Sample stage:", updatedLeads[0].current_stage);
+        }
+        
+        setLeads(updatedLeads);
+        console.log("✅ Leads state updated successfully");
+      } catch (error) {
+        console.error("❌ Error refreshing leads:", error);
+      }
+    }
+  };
+
   async function openAddLeadModal() {
     setShowAddModal(true);
   }

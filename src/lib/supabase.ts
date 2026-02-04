@@ -633,6 +633,8 @@ export const db = {
         }
         
         console.log("✅ Complete lead data fetched:", completeLeadData);
+        console.log("🔍 Source data:", completeLeadData.source);
+        console.log("🔍 Current stage data:", completeLeadData.current_stage);
         
         // Return complete lead data for immediate UI update
         return completeLeadData;

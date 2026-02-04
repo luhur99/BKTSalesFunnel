@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity, Globe, Tag, Edit2, X, Plus } from "lucide-react";
 import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory, LeadSource } from "@/types/lead";
 import { db } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -20,6 +22,7 @@ interface LeadDetailModalProps {
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
+  const { toast } = useToast();
   const [stages, setStages] = useState<Stage[]>([]);
   const [activities, setActivities] = useState<LeadActivity[]>([]);
   const [stageHistory, setStageHistory] = useState<LeadStageHistory[]>([]);
@@ -28,6 +31,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   const [availableLabels, setAvailableLabels] = useState<string[]>([]);
   const [moveToStage, setMoveToStage] = useState("");
   const [moveNotes, setMoveNotes] = useState("");
+  const [moveReason, setMoveReason] = useState("manual_move");
   const [newActivity, setNewActivity] = useState({
     type: "note" as ActivityType,
     description: "",
@@ -95,35 +99,30 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     try {
       setIsSubmitting(true);
       
-      console.log("🔄 MOVE STAGE - Starting...");
-      console.log("📊 Lead ID:", lead.id);
-      console.log("📊 Current Stage:", lead.current_stage_id);
-      console.log("📊 Target Stage:", moveToStage);
-      console.log("📊 Reason: manual_move");
-      console.log("📊 Notes:", moveNotes);
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.email || "System";
       
-      // CRITICAL: Wait for moveToStage to complete and return updated lead with relations
-      const updatedLead = await db.leads.moveToStage(lead.id, moveToStage, "manual_move", moveNotes, "Sales User");
+      console.log("🔄 Moving lead to stage:", moveToStage);
+      await db.leads.moveToStage(lead.id, moveToStage, moveReason, moveNotes, userId);
       
-      console.log("✅ MOVE STAGE - Success! Updated lead:", updatedLead);
+      toast({
+        title: "Success",
+        description: "Lead moved to new stage successfully",
+      });
       
-      setMoveToStage("");
-      setMoveNotes("");
-      
-      // CRITICAL FIX: Call onUpdate to refresh parent component
-      console.log("🔄 Triggering parent refresh...");
-      onUpdate();
-      
-      // Close modal after successful move
-      console.log("🔄 Closing modal...");
+      // Close modal and trigger refresh
       onClose();
+      if (onUpdate) {
+        await onUpdate();
+      }
       
     } catch (error: any) {
-      console.error("❌ MOVE STAGE - Error:", error);
-      
-      // Enhanced error message for users
-      const errorMessage = error?.message || "Terjadi kesalahan saat memindahkan lead";
-      alert(`❌ Gagal memindahkan lead:\n\n${errorMessage}\n\nSilakan refresh halaman dan coba lagi.`);
+      console.error("❌ Error moving lead:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to move lead. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -162,29 +161,50 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     if (!lead) return;
 
     const broadcastStages = stages.filter(s => s.funnel_type === "broadcast");
-    if (broadcastStages.length === 0) return;
+    if (broadcastStages.length === 0) {
+      toast({
+        title: "Error",
+        description: "No broadcast stages available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const firstBroadcastStage = broadcastStages.sort((a, b) => a.stage_number - b.stage_number)[0];
 
     try {
       setIsSubmitting(true);
       
-      console.log("🔄 Moving to broadcast funnel...");
-      const updatedLead = await db.leads.moveToStage(
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.email || "System";
+
+      console.log("🔄 Moving lead to broadcast funnel, stage:", firstBroadcastStage);
+      await db.leads.moveToStage(
         lead.id,
-        broadcastStages[0].id,
-        "no_response",
-        "Lead tidak merespon, dipindah ke Broadcast Funnel",
-        "Sales User"
+        firstBroadcastStage.id,
+        "moved_to_broadcast",
+        "Moved to broadcast funnel",
+        userId
       );
-      
-      console.log("✅ Moved to broadcast:", updatedLead);
-      console.log("🔄 Triggering parent refresh...");
-      onUpdate();
-      
-      console.log("🔄 Closing modal...");
+
+      toast({
+        title: "Success",
+        description: "Lead moved to Broadcast funnel",
+      });
+
+      // Close modal and trigger refresh
       onClose();
-    } catch (error) {
-      console.error("Error moving to broadcast:", error);
-      alert("❌ Gagal memindahkan lead ke Broadcast. Silakan coba lagi.");
+      if (onUpdate) {
+        await onUpdate();
+      }
+
+    } catch (error: any) {
+      console.error("❌ Error moving to broadcast:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to move lead to Broadcast",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -194,29 +214,50 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     if (!lead) return;
 
     const followUpStages = stages.filter(s => s.funnel_type === "follow_up");
-    if (followUpStages.length === 0) return;
+    if (followUpStages.length === 0) {
+      toast({
+        title: "Error",
+        description: "No follow-up stages available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const firstFollowUpStage = followUpStages.sort((a, b) => a.stage_number - b.stage_number)[0];
 
     try {
       setIsSubmitting(true);
       
-      console.log("🔄 Moving back to follow up funnel...");
-      const updatedLead = await db.leads.moveToStage(
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.email || "System";
+
+      console.log("🔄 Moving lead to follow-up funnel, stage:", firstFollowUpStage);
+      await db.leads.moveToStage(
         lead.id,
-        followUpStages[0].id,
-        "responded",
-        "Lead merespon, kembali ke Follow Up Funnel",
-        "Sales User"
+        firstFollowUpStage.id,
+        "moved_to_followup",
+        "Moved to follow-up funnel",
+        userId
       );
-      
-      console.log("✅ Moved to follow up:", updatedLead);
-      console.log("🔄 Triggering parent refresh...");
-      onUpdate();
-      
-      console.log("🔄 Closing modal...");
+
+      toast({
+        title: "Success",
+        description: "Lead moved to Follow Up funnel",
+      });
+
+      // Close modal and trigger refresh
       onClose();
-    } catch (error) {
-      console.error("Error moving to follow up:", error);
-      alert("❌ Gagal memindahkan lead ke Follow Up. Silakan coba lagi.");
+      if (onUpdate) {
+        await onUpdate();
+      }
+
+    } catch (error: any) {
+      console.error("❌ Error moving to follow-up:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to move lead to Follow Up",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
