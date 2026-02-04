@@ -84,7 +84,6 @@ export function ScriptTemplatesTab({ funnelId }: ScriptTemplatesTabProps) {
     try {
       setSaving(true);
       // Use upsert to handle both create and update
-      // @ts-expect-error - upsert method added dynamically
       await (db.scripts as any).upsert({
         stage_id: selectedStageId,
         script_text: scriptText,
