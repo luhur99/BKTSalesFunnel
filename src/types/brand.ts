@@ -64,7 +64,6 @@ export interface CreateFunnelInput {
   brand_id: string;
   name: string;
   description?: string;
-  is_default?: boolean;
 }
 
 export interface UpdateFunnelInput {
