@@ -110,16 +110,16 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: "Lead moved to new stage successfully",
       });
       
-      // CRITICAL FIX: Call onUpdate first to refresh parent data
+      // CRITICAL: Call onUpdate and WAIT for it to complete
       console.log("🔄 Calling onUpdate to refresh parent data...");
       if (onUpdate) {
         await onUpdate();
       }
+      console.log("✅ onUpdate completed, waiting before close...");
       
-      // Small delay to ensure state updates propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay to ensure React state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Then close modal
       console.log("✅ Closing modal after successful update");
       onClose();
       
@@ -199,16 +199,16 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: "Lead moved to Broadcast funnel",
       });
 
-      // CRITICAL FIX: Call onUpdate first to refresh parent data
+      // CRITICAL: Call onUpdate and WAIT for it to complete
       console.log("🔄 Calling onUpdate to refresh parent data...");
       if (onUpdate) {
         await onUpdate();
       }
+      console.log("✅ onUpdate completed, waiting before close...");
       
-      // Small delay to ensure state updates propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay to ensure React state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Then close modal
       console.log("✅ Closing modal after successful update");
       onClose();
 
@@ -259,16 +259,16 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: "Lead moved to Follow Up funnel",
       });
 
-      // CRITICAL FIX: Call onUpdate first to refresh parent data
+      // CRITICAL: Call onUpdate and WAIT for it to complete
       console.log("🔄 Calling onUpdate to refresh parent data...");
       if (onUpdate) {
         await onUpdate();
       }
+      console.log("✅ onUpdate completed, waiting before close...");
       
-      // Small delay to ensure state updates propagate
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Small delay to ensure React state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Then close modal
       console.log("✅ Closing modal after successful update");
       onClose();
 
