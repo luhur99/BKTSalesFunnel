@@ -5,12 +5,12 @@ import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, BarChart3, LayoutGrid, List, Settings, TrendingUp, Users, Target, Trophy, XCircle, Edit, Trash2, Download, Power, MoreVertical } from "lucide-react";
+import { ArrowLeft, Plus, BarChart3, LayoutGrid, List, Settings, TrendingUp, Users, Target, Trophy, XCircle } from "lucide-react";
 import { db } from "@/lib/supabase";
 import { getFunnelById } from "@/services/brandService";
 import type { Funnel } from "@/types/brand";
 import type { Lead, Stage } from "@/types/lead";
-import type { StageVelocity, HeatmapDataPoint, VelocityChartData, HeatmapCell } from "@/types/analytics";
+import type { StageVelocity, HeatmapCell, VelocityChartData } from "@/types/analytics";
 import LeadKanban from "@/components/LeadKanban";
 import { LeadListView } from "@/components/LeadListView";
 import AddLeadModal from "@/components/AddLeadModal";
@@ -19,15 +19,6 @@ import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { LeadDetailModal } from "@/components/LeadDetailModal";
 import { ManageFunnelStagesDialog } from "@/components/ManageFunnelStagesDialog";
-import { EditFunnelDialog } from "@/components/EditFunnelDialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 export default function FunnelViewPage() {
   const router = useRouter();
@@ -49,10 +40,7 @@ export default function FunnelViewPage() {
   const [lostCount, setLostCount] = useState<number>(0);
   const [funnelStages, setFunnelStages] = useState<Stage[]>([]);
   const [isManageStagesOpen, setIsManageStagesOpen] = useState(false);
-  const [isEditFunnelOpen, setIsEditFunnelOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [detailLead, setDetailLead] = useState<Lead | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailLeadId, setDetailLeadId] = useState<string | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -116,8 +104,7 @@ export default function FunnelViewPage() {
   const loadAnalytics = async () => {
     try {
       setLoadingAnalytics(true);
-      console.log("📊 Loading analytics for funnel:", funnelId);
-
+      
       const [velocityResult, heatmapResult] = await Promise.allSettled([
         db.analytics.getStageVelocity(funnelId as string),
         db.analytics.getHeatmapAnalytics("all", funnelId as string)
@@ -131,18 +118,14 @@ export default function FunnelViewPage() {
           leads: item.total_leads_passed
         }));
         setVelocityData(formattedVelocity);
-        console.log("✅ Stage velocity loaded:", formattedVelocity.length);
       }
 
       // Process Heatmap Data
       if (heatmapResult.status === "fulfilled" && Array.isArray(heatmapResult.value)) {
         const rawHeatmap = heatmapResult.value;
-        
-        // Calculate max value for intensity
         const maxCount = Math.max(...rawHeatmap.map(d => d.count), 1);
         
         const formattedHeatmap: HeatmapCell[] = rawHeatmap.map(item => {
-          // Calculate intensity
           let intensity: "low" | "medium" | "high" | "none" = "none";
           if (item.count > 0) {
             const ratio = item.count / maxCount;
@@ -158,9 +141,7 @@ export default function FunnelViewPage() {
             intensity
           };
         });
-        
         setHeatmapData(formattedHeatmap);
-        console.log("✅ Heatmap data loaded:", formattedHeatmap.length);
       }
     } catch (error) {
       console.error("❌ Error loading analytics:", error);
@@ -169,37 +150,30 @@ export default function FunnelViewPage() {
     }
   };
 
-  // Filter leads based on active tab
   const filteredLeads = leads.filter((lead) => {
     if (activeTab === "all") return true;
     return lead.current_funnel === activeTab;
   });
 
-  // Calculate stats
   const totalLeads = leads.length;
   const followUpLeads = leads.filter((l) => l.current_funnel === "follow_up").length;
   const broadcastLeads = leads.filter((l) => l.current_funnel === "broadcast").length;
 
   const handleLeadAdded = async () => {
-    // Refresh leads after adding new lead
     if (funnelId && typeof funnelId === "string") {
       try {
-        console.log("🔄 Refreshing leads after add/update...");
         const leadsData = await db.leads.getByFunnelId(funnelId);
         setLeads(leadsData || []);
-        console.log("✅ Leads refreshed:", leadsData?.length || 0);
       } catch (error) {
         console.error("❌ Error refreshing leads:", error);
       }
     }
   };
 
-  // Placeholder handlers for list view
   const handleUpdateLead = async (leadId: string, updates: Partial<Lead>) => {
     try {
-      console.log("🔄 Updating lead:", leadId, updates);
       await db.leads.update(leadId, updates);
-      await handleLeadAdded(); // Refresh leads
+      await handleLeadAdded();
       toast({ title: "Success", description: "Lead updated successfully" });
     } catch (error: any) {
       console.error("❌ Error updating lead:", error);
@@ -213,9 +187,8 @@ export default function FunnelViewPage() {
 
   const handleDeleteLead = async (leadId: string) => {
     try {
-      console.log("🗑️ Deleting lead:", leadId);
       await db.leads.delete(leadId);
-      await handleLeadAdded(); // Refresh leads
+      await handleLeadAdded();
       toast({ title: "Success", description: "Lead deleted successfully" });
     } catch (error: any) {
       console.error("❌ Error deleting lead:", error);
@@ -226,141 +199,6 @@ export default function FunnelViewPage() {
       });
     }
   };
-
-  async function handleToggleActive() {
-    if (!currentFunnel || !funnelId || typeof funnelId !== "string") return;
-
-    try {
-      await brandService.updateFunnel(funnelId, {
-        is_active: !currentFunnel.is_active,
-      });
-
-      toast({
-        title: "Success",
-        description: `Funnel ${currentFunnel.is_active ? "deactivated" : "activated"} successfully`,
-      });
-
-      loadFunnel();
-    } catch (error) {
-      console.error("Error toggling funnel status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update funnel status",
-        variant: "destructive",
-      });
-    }
-  }
-
-  async function handleDeleteFunnel() {
-    if (!currentFunnel || !funnelId || typeof funnelId !== "string") return;
-    if (!brandId || typeof brandId !== "string") return;
-
-    const confirmDelete = confirm(
-      `Are you sure you want to delete "${currentFunnel.name}"?\n\nThis will permanently delete:\n- The funnel\n- All ${leads.length} leads in this funnel\n- All lead activities and history\n\nThis action cannot be undone!`
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-      setIsDeleting(true);
-      await brandService.deleteFunnel(funnelId);
-
-      toast({
-        title: "Success",
-        description: "Funnel deleted successfully",
-      });
-
-      router.push(`/brand/${brandId}`);
-    } catch (error) {
-      console.error("Error deleting funnel:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete funnel",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
-  async function handleUpdateFunnel(input: UpdateFunnelInput) {
-    if (!funnelId || typeof funnelId !== "string") return;
-
-    try {
-      await brandService.updateFunnel(funnelId, input);
-
-      toast({
-        title: "Success",
-        description: "Funnel updated successfully",
-      });
-
-      loadFunnel();
-    } catch (error) {
-      console.error("Error updating funnel:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update funnel",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  }
-
-  async function handleExportLeads() {
-    if (!leads || leads.length === 0) {
-      toast({
-        title: "No Data",
-        description: "No leads to export",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const csvData = leads.map((lead) => ({
-        Name: lead.name || "",
-        Phone: lead.phone,
-        Email: lead.email || "",
-        Company: lead.company || "",
-        "Deal Value": lead.deal_value || 0,
-        Status: lead.status,
-        "Funnel Type": lead.funnel_type,
-        Stage: lead.current_stage_id,
-        Labels: lead.labels?.join(", ") || "",
-        "Created At": new Date(lead.created_at).toLocaleDateString(),
-      }));
-
-      const headers = Object.keys(csvData[0]);
-      const csvContent = [
-        headers.join(","),
-        ...csvData.map((row) =>
-          headers.map((header) => `"${row[header as keyof typeof row]}"`).join(",")
-        ),
-      ].join("\n");
-
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${currentFunnel?.name || "funnel"}_leads_${new Date().toISOString().split("T")[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Success",
-        description: `Exported ${leads.length} leads to CSV`,
-      });
-    } catch (error) {
-      console.error("Error exporting leads:", error);
-      toast({
-        title: "Error",
-        description: "Failed to export leads",
-        variant: "destructive",
-      });
-    }
-  }
 
   async function openAddLeadModal() {
     setShowAddModal(true);
@@ -398,7 +236,6 @@ export default function FunnelViewPage() {
       />
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
           <Link href="/dashboard" className="hover:text-blue-600 transition-colors">
             Brands
@@ -414,7 +251,6 @@ export default function FunnelViewPage() {
           <span className="text-gray-900 font-medium">{funnel.name}</span>
         </div>
 
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Button
@@ -443,56 +279,15 @@ export default function FunnelViewPage() {
             </Button>
 
             <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <MoreVertical className="w-4 h-4" />
-                    Funnel Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Funnel Management</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem onClick={() => setIsEditFunnelOpen(true)}>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Funnel Details
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem onClick={() => setIsManageStagesOpen(true)}>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Manage Stages
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem onClick={() => router.push("/analytics-report")}>
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    View Analytics
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem onClick={handleExportLeads}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Leads (CSV)
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem onClick={handleToggleActive}>
-                    <Power className="w-4 h-4 mr-2" />
-                    {currentFunnel?.is_active ? "Deactivate" : "Activate"} Funnel
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    onClick={handleDeleteFunnel}
-                    className="text-red-600 focus:text-red-600"
-                    disabled={isDeleting}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    {isDeleting ? "Deleting..." : "Delete Funnel"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setIsManageStagesOpen(true)}
+              >
+                <Settings className="w-4 h-4" />
+                Manage Stages
+              </Button>
 
               <Button onClick={openAddLeadModal} size="sm" className="gap-2">
                 <Plus className="w-4 h-4" />
@@ -502,7 +297,6 @@ export default function FunnelViewPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-3">
@@ -526,7 +320,6 @@ export default function FunnelViewPage() {
           </Card>
         </div>
 
-        {/* Win and Lost Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -555,7 +348,6 @@ export default function FunnelViewPage() {
           </Card>
         </div>
 
-        {/* Filter Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="mb-6">
           <TabsList>
             <TabsTrigger value="all">
@@ -570,7 +362,6 @@ export default function FunnelViewPage() {
           </TabsList>
         </Tabs>
 
-        {/* Filters and View Toggle */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex gap-2">
             <Button
@@ -592,7 +383,6 @@ export default function FunnelViewPage() {
           </div>
         </div>
 
-        {/* Lead Management View */}
         {filteredLeads.length === 0 ? (
           <Card className="p-12">
             <div className="text-center">
@@ -615,7 +405,8 @@ export default function FunnelViewPage() {
                 funnelType={activeTab === "all" ? undefined : activeTab}
                 brandId={brandId as string}
                 funnelId={funnelId as string}
-                stages={stages}
+                stages={funnelStages}
+                onLeadClick={(lead) => setDetailLeadId(lead.id)}
               />
             ) : (
               <LeadListView
@@ -623,15 +414,15 @@ export default function FunnelViewPage() {
                 funnelType={activeTab === "all" ? undefined : activeTab}
                 brandId={brandId as string}
                 funnelId={funnelId as string}
-                stages={stages}
+                stages={funnelStages}
                 onUpdateLead={handleUpdateLead}
                 onDeleteLead={handleDeleteLead}
+                onLeadClick={(lead) => setDetailLeadId(lead.id)}
               />
             )}
           </>
         )}
 
-        {/* Detailed Analytics Section */}
         <div className="mt-12">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Detailed Analytics</h2>
@@ -693,7 +484,6 @@ export default function FunnelViewPage() {
         </div>
       </div>
 
-      {/* Add Lead Modal */}
       {showAddModal && (
         <AddLeadModal
           isOpen={showAddModal}
@@ -704,31 +494,21 @@ export default function FunnelViewPage() {
         />
       )}
 
-      {/* Lead Detail Modal */}
-      {isDetailModalOpen && detailLead && (
+      {detailLeadId && (
         <LeadDetailModal
-          lead={detailLead}
-          isOpen={isDetailModalOpen}
-          onClose={() => {
-            setIsDetailModalOpen(false);
-            setDetailLead(null);
+          leadId={detailLeadId}
+          isOpen={!!detailLeadId}
+          onClose={() => setDetailLeadId(null)}
+          onUpdate={() => {
+            loadLeads();
+            loadFunnel();
           }}
-          onUpdate={loadLeads}
-        />
-      )}
-
-      {currentFunnel && (
-        <EditFunnelDialog
-          funnel={currentFunnel}
-          isOpen={isEditFunnelOpen}
-          onClose={() => setIsEditFunnelOpen(false)}
-          onUpdate={handleUpdateFunnel}
         />
       )}
 
       <ManageFunnelStagesDialog
         funnelId={funnelId as string}
-        funnelName={currentFunnel?.name || ""}
+        funnelName={funnel?.name || ""}
         isOpen={isManageStagesOpen}
         onClose={() => setIsManageStagesOpen(false)}
         onUpdate={() => {
