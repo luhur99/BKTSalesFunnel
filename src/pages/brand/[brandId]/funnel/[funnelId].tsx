@@ -496,7 +496,7 @@ export default function FunnelViewPage() {
 
       {detailLeadId && (
         <LeadDetailModal
-          leadId={detailLeadId}
+          lead={leads.find(l => l.id === detailLeadId) || null}
           isOpen={!!detailLeadId}
           onClose={() => setDetailLeadId(null)}
           onUpdate={() => {
@@ -508,10 +508,9 @@ export default function FunnelViewPage() {
 
       <ManageFunnelStagesDialog
         funnelId={funnelId as string}
-        funnelName={funnel?.name || ""}
-        isOpen={isManageStagesOpen}
-        onClose={() => setIsManageStagesOpen(false)}
-        onUpdate={() => {
+        open={isManageStagesOpen}
+        onOpenChange={setIsManageStagesOpen}
+        onStagesUpdated={() => {
           loadFunnelStages();
           loadLeads();
         }}

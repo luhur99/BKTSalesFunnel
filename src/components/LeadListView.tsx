@@ -42,6 +42,7 @@ interface LeadListViewProps {
   stages: Stage[];
   onUpdateLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
   onDeleteLead: (leadId: string) => Promise<void>;
+  onLeadClick?: (lead: Lead) => void;
 }
 
 interface DateFilter {
@@ -51,7 +52,7 @@ interface DateFilter {
   monthLabel?: string;
 }
 
-export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onUpdateLead, onDeleteLead }: LeadListViewProps) {
+export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onUpdateLead, onDeleteLead, onLeadClick }: LeadListViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFunnel, setFilterFunnel] = useState<"all" | FunnelType>("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "deal" | "lost">("active");
@@ -68,8 +69,12 @@ export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onU
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   const handleLeadClick = (lead: Lead) => {
-    setSelectedLead(lead);
-    setShowDetailModal(true);
+    if (onLeadClick) {
+      onLeadClick(lead);
+    } else {
+      setSelectedLead(lead);
+      setShowDetailModal(true);
+    }
   };
 
   const handleEditClick = (lead: Lead) => {

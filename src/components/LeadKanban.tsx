@@ -14,9 +14,10 @@ interface LeadKanbanProps {
   brandId?: string;
   funnelId?: string;
   stages: Stage[];
+  onLeadClick?: (lead: Lead) => void;
 }
 
-export default function LeadKanban({ leads, funnelType, brandId, funnelId, stages }: LeadKanbanProps) {
+export default function LeadKanban({ leads, funnelType, brandId, funnelId, stages, onLeadClick }: LeadKanbanProps) {
   // Filter stages by funnel if needed
   const filteredStages = funnelType && funnelType !== "follow_up" && funnelType !== "broadcast" // handle 'all' or undefined
     ? stages 
@@ -34,8 +35,11 @@ export default function LeadKanban({ leads, funnelType, brandId, funnelId, stage
   };
 
   const handleLeadClick = (lead: Lead) => {
-    // TODO: Open lead detail modal
-    console.log("Lead clicked:", lead);
+    if (onLeadClick) {
+      onLeadClick(lead);
+    } else {
+      console.log("Lead clicked:", lead);
+    }
   };
 
   return (
