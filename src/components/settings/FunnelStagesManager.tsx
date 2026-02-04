@@ -51,10 +51,11 @@ export function FunnelStagesManager() {
   const handleAdd = async () => {
     try {
       await db.stages.create({
-        name: formData.stage_name,
+        stage_name: formData.stage_name,
         description: formData.description,
         funnel_type: formData.funnel_type,
-        order: formData.stage_number,
+        stage_number: formData.stage_number,
+        funnel_id: null, // Global template
       });
       setIsAddDialogOpen(false);
       setFormData({ stage_name: "", description: "", funnel_type: "follow_up", stage_number: 1 });
@@ -68,9 +69,9 @@ export function FunnelStagesManager() {
     if (!editingStage) return;
     try {
       await db.stages.update(editingStage.id, {
-        name: formData.stage_name,
+        stage_name: formData.stage_name,
         description: formData.description,
-        order: formData.stage_number,
+        stage_number: formData.stage_number,
       });
       setIsEditDialogOpen(false);
       setEditingStage(null);
