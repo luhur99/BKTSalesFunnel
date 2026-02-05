@@ -241,6 +241,7 @@ export default function BrandPage() {
                   funnel={funnel}
                   brandColor={brand.color}
                   onSelect={handleSelectFunnel}
+                  onDelete={() => loadBrandData(brandId as string)}
                 />
               ))}
             </div>
