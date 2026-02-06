@@ -96,20 +96,21 @@ export function FunnelCard({ funnel, brandColor, onSelect, onDelete }: FunnelCar
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>⚠️ Hapus Funnel "{funnel.name}"?</AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-2">
-                    <p className="font-semibold text-red-600">
-                      Tindakan ini tidak dapat dibatalkan!
-                    </p>
-                    <p>
-                      Menghapus funnel ini akan menghapus:
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 text-sm">
-                      <li>Semua leads di funnel ini ({funnel.total_leads_count || 0} leads)</li>
-                      <li>Semua stages di funnel ini</li>
-                      <li>Semua activities terkait</li>
-                      <li>Semua stage history terkait</li>
-                    </ul>
+                  <AlertDialogTitle>Hapus Funnel?</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div>
+                      <p className="mb-2">
+                        Tindakan ini akan menghapus funnel <strong>{funnel.name}</strong> beserta:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 mb-2">
+                        <li>Semua leads di funnel ini</li>
+                        <li>Semua activities</li>
+                        <li>Semua stage history</li>
+                      </ul>
+                      <p className="text-destructive font-semibold">
+                        Tindakan ini tidak dapat dibatalkan!
+                      </p>
+                    </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
