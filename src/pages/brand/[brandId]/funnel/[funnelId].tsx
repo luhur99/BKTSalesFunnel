@@ -11,9 +11,9 @@ import { getFunnelById } from "@/services/brandService";
 import type { Funnel } from "@/types/brand";
 import type { Lead, Stage } from "@/types/lead";
 import type { StageVelocity, HeatmapCell, VelocityChartData } from "@/types/analytics";
-import LeadKanban from "@/components/LeadKanban";
 import { LeadListView } from "@/components/LeadListView";
-import AddLeadModal from "@/components/AddLeadModal";
+import LeadKanban from "@/components/LeadKanban";
+import { AddLeadModal } from "@/components/AddLeadModal";
 import { useToast } from "@/hooks/use-toast";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
@@ -212,17 +212,12 @@ export default function FunnelViewPage() {
         const updatedLeads = await db.leads.getByFunnelId(funnelId);
         console.log("✅ Fresh leads data received:", updatedLeads.length, "leads");
         
-        // Log sample lead to verify data structure
-        if (updatedLeads.length > 0) {
-          console.log("🔍 Sample lead after refresh:", {
-            id: updatedLeads[0].id,
-            name: updatedLeads[0].name,
-            current_stage_id: updatedLeads[0].current_stage_id,
-            current_stage_name: updatedLeads[0].current_stage?.stage_name,
-            current_funnel: updatedLeads[0].current_funnel,
-            source_name: updatedLeads[0].source?.name
-          });
-        }
+        // Count won and lost leads
+        const won = updatedLeads.filter(lead => lead.status === "deal").length;
+        const lost = updatedLeads.filter(lead => lead.status === "lost").length;
+        
+        setWonCount(won);
+        setLostCount(lost);
         
         // Force state update
         setLeads(updatedLeads);
