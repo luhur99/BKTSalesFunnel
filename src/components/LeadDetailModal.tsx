@@ -81,7 +81,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         source_id: lead.source_id || "",
         status: lead.status || "active",
         custom_labels: lead.custom_labels || [],
-        deal_value: lead.deal_value || "",
+        deal_value: lead.deal_value ? String(lead.deal_value) : "",
       });
     }
   }, [lead]);
