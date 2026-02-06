@@ -24,7 +24,17 @@ interface LeadDetailModalProps {
 interface Funnel {
   id: string;
   name: string;
-  funnel_type: "follow_up" | "broadcast";
+}
+
+interface EditFormState {
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  source_id: string;
+  status: string;
+  custom_labels: string[];
+  deal_value: string | number;
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
@@ -48,15 +58,15 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   const [labelInput, setLabelInput] = useState("");
 
   // Edit form state
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<EditFormState>({
     name: "",
     email: "",
     phone: "",
     company: "",
     source_id: "",
     status: "active",
-    custom_labels: [] as string[],
-    deal_value: "" as string | number,
+    custom_labels: [],
+    deal_value: "",
   });
 
   useEffect(() => {
@@ -97,22 +107,19 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       // FIX #1: Load ALL funnels from the brand for dropdown grouping
       const { data: funnelsData, error: funnelsError } = await supabase
         .from("funnels")
-        .select("id, name, funnel_type")
+        .select("id, name")
         .eq("brand_id", lead.brand_id)
-        .order("funnel_type", { ascending: true })
         .order("name", { ascending: true });
 
       if (funnelsError) throw funnelsError;
       
       console.log("✅ Loaded ALL funnels:", funnelsData?.length, "funnels");
 
-      const [leadActivities, leadHistory, stageScript, allSources, customLabels] = await Promise.all([
-        db.activities.getByLead(lead.id),
-        db.stageHistory.getByLead(lead.id),
-        lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null),
-        db.sources.getAll(),
-        db.customLabels.getAll()
-      ]);
+      const leadActivities = await db.activities.getByLead(lead.id);
+      const leadHistory = await db.stageHistory.getByLead(lead.id);
+      const stageScript = lead.current_stage_id ? await db.scripts.getByStage(lead.current_stage_id) : null;
+      const allSources = await db.sources.getAll();
+      const customLabels = await db.customLabels.getAll();
 
       setStages(allStagesData || []);
       setFunnels(funnelsData || []);
@@ -993,16 +1000,36 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                         const funnelStages = stages.filter(s => s.funnel_id === funnel.id);
                         if (funnelStages.length === 0) return null;
                         
+                        // Group stages by funnel_type within this funnel
+                        const followUpStages = funnelStages.filter(s => s.funnel_type === "follow_up");
+                        const broadcastStages = funnelStages.filter(s => s.funnel_type === "broadcast");
+                        
                         return (
                           <div key={funnel.id}>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
-                              {funnel.name} ({funnel.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"})
-                            </div>
-                            {funnelStages.map((stage) => (
-                              <SelectItem key={stage.id} value={stage.id}>
-                                Stage {stage.stage_number}: {stage.stage_name}
-                              </SelectItem>
-                            ))}
+                            {followUpStages.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                                  {funnel.name} - Follow Up
+                                </div>
+                                {followUpStages.map((stage) => (
+                                  <SelectItem key={stage.id} value={stage.id}>
+                                    Stage {stage.stage_number}: {stage.stage_name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            {broadcastStages.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                                  {funnel.name} - Broadcast
+                                </div>
+                                {broadcastStages.map((stage) => (
+                                  <SelectItem key={stage.id} value={stage.id}>
+                                    Stage {stage.stage_number}: {stage.stage_name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
                           </div>
                         );
                       })}

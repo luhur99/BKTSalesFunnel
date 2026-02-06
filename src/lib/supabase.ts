@@ -703,6 +703,36 @@ export const db = {
         .order("moved_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+    
+    create: async (historyData: {
+      lead_id: string;
+      from_stage_id: string | null;
+      to_stage_id: string;
+      from_funnel: "follow_up" | "broadcast" | null;
+      to_funnel: "follow_up" | "broadcast";
+      reason: string;
+      notes: string;
+      moved_by: string;
+    }) => {
+      if (!isConnected) {
+        const newHistory = {
+          id: `hist-${Date.now()}`,
+          ...historyData,
+          moved_at: new Date().toISOString()
+        };
+        MOCK_STAGE_HISTORY.unshift(newHistory);
+        return newHistory;
+      }
+      
+      const { data, error } = await supabase
+        .from("lead_stage_history")
+        .insert([historyData])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
     }
   },
 
