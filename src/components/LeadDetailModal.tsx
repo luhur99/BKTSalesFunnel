@@ -21,9 +21,16 @@ interface LeadDetailModalProps {
   onUpdate: () => Promise<void>;
 }
 
+interface Funnel {
+  id: string;
+  name: string;
+  funnel_type: "follow_up" | "broadcast";
+}
+
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
   const { toast } = useToast();
   const [stages, setStages] = useState<Stage[]>([]);
+  const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [activities, setActivities] = useState<LeadActivity[]>([]);
   const [stageHistory, setStageHistory] = useState<LeadStageHistory[]>([]);
   const [script, setScript] = useState<StageScript | null>(null);
@@ -73,8 +80,33 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     if (!lead) return;
 
     try {
-      const [allStages, leadActivities, leadHistory, stageScript, allSources, customLabels] = await Promise.all([
-        db.stages.getByFunnel(lead.funnel_id),
+      console.log("🔄 Loading lead data for brand:", lead.brand_id);
+      
+      // FIX #1: Load ALL stages from ALL funnels in the brand (not just current funnel)
+      const { data: allStagesData, error: stagesError } = await supabase
+        .from("stages")
+        .select("*")
+        .eq("brand_id", lead.brand_id)
+        .order("funnel_type", { ascending: true })
+        .order("stage_number", { ascending: true });
+
+      if (stagesError) throw stagesError;
+      
+      console.log("✅ Loaded ALL stages from brand:", allStagesData?.length, "stages");
+
+      // FIX #1: Load ALL funnels from the brand for dropdown grouping
+      const { data: funnelsData, error: funnelsError } = await supabase
+        .from("funnels")
+        .select("id, name, funnel_type")
+        .eq("brand_id", lead.brand_id)
+        .order("funnel_type", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (funnelsError) throw funnelsError;
+      
+      console.log("✅ Loaded ALL funnels:", funnelsData?.length, "funnels");
+
+      const [leadActivities, leadHistory, stageScript, allSources, customLabels] = await Promise.all([
         db.activities.getByLead(lead.id),
         db.stageHistory.getByLead(lead.id),
         lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null),
@@ -82,7 +114,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         db.customLabels.getAll()
       ]);
 
-      setStages(allStages || []);
+      setStages(allStagesData || []);
+      setFunnels(funnelsData || []);
       setActivities(leadActivities || []);
       setStageHistory(leadHistory || []);
       setScript(stageScript);
@@ -102,17 +135,40 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.email || "System";
       
+      // FIX #2: Find target stage to get funnel_type
       const targetStage = stages.find(s => s.id === moveToStage);
+      if (!targetStage) {
+        throw new Error("Target stage not found");
+      }
+
       const fromStage = lead.current_stage;
       
       console.log("🔄 Moving lead to stage:", moveToStage);
-      console.log("📊 From:", fromStage?.stage_name, "→ To:", targetStage?.stage_name);
+      console.log("📊 From:", fromStage?.stage_name, "→ To:", targetStage.stage_name);
+      console.log("📊 Funnel Type:", fromStage?.funnel_type, "→", targetStage.funnel_type);
       
-      await db.leads.moveToStage(lead.id, moveToStage, moveReason, moveNotes, userId);
+      // FIX #2: Update BOTH current_stage_id AND current_funnel
+      await db.leads.update(lead.id, {
+        current_stage_id: moveToStage,
+        current_funnel: targetStage.funnel_type, // ✅ Update current_funnel based on target stage
+        updated_at: new Date().toISOString()
+      });
+
+      // Create history record
+      await db.stageHistory.create({
+        lead_id: lead.id,
+        from_stage_id: lead.current_stage_id,
+        to_stage_id: moveToStage,
+        from_funnel: lead.current_funnel,
+        to_funnel: targetStage.funnel_type,
+        reason: moveReason,
+        notes: moveNotes,
+        moved_by: userId
+      });
       
       toast({
         title: "✅ Lead Berhasil Dipindahkan",
-        description: `${fromStage?.stage_name || 'Stage sebelumnya'} → ${targetStage?.stage_name || 'Stage baru'}`,
+        description: `${fromStage?.stage_name || 'Stage sebelumnya'} → ${targetStage.stage_name}`,
       });
       
       console.log("🔄 Calling onUpdate to refresh parent data...");
@@ -188,13 +244,24 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       console.log("🔄 Moving lead to broadcast funnel, stage:", firstBroadcastStage);
       console.log("📊 From:", lead.current_stage?.stage_name, "(Follow Up) → To:", firstBroadcastStage.stage_name, "(Broadcast)");
       
-      await db.leads.moveToStage(
-        lead.id,
-        firstBroadcastStage.id,
-        "moved_to_broadcast",
-        "Moved to broadcast funnel",
-        userId
-      );
+      // Update BOTH stage and funnel
+      await db.leads.update(lead.id, {
+        current_stage_id: firstBroadcastStage.id,
+        current_funnel: "broadcast",
+        updated_at: new Date().toISOString()
+      });
+
+      // Create history
+      await db.stageHistory.create({
+        lead_id: lead.id,
+        from_stage_id: lead.current_stage_id,
+        to_stage_id: firstBroadcastStage.id,
+        from_funnel: lead.current_funnel,
+        to_funnel: "broadcast",
+        reason: "moved_to_broadcast",
+        notes: "Moved to broadcast funnel",
+        moved_by: userId
+      });
 
       toast({
         title: "✅ Lead Dipindahkan ke Broadcast",
@@ -246,13 +313,24 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       console.log("🔄 Moving lead to follow-up funnel, stage:", firstFollowUpStage);
       console.log("📊 From:", lead.current_stage?.stage_name, "(Broadcast) → To:", firstFollowUpStage.stage_name, "(Follow Up)");
       
-      await db.leads.moveToStage(
-        lead.id,
-        firstFollowUpStage.id,
-        "moved_to_followup",
-        "Moved to follow-up funnel",
-        userId
-      );
+      // Update BOTH stage and funnel
+      await db.leads.update(lead.id, {
+        current_stage_id: firstFollowUpStage.id,
+        current_funnel: "follow_up",
+        updated_at: new Date().toISOString()
+      });
+
+      // Create history
+      await db.stageHistory.create({
+        lead_id: lead.id,
+        from_stage_id: lead.current_stage_id,
+        to_stage_id: firstFollowUpStage.id,
+        from_funnel: lead.current_funnel,
+        to_funnel: "follow_up",
+        reason: "moved_to_followup",
+        notes: "Moved to follow-up funnel",
+        moved_by: userId
+      });
 
       toast({
         title: "✅ Lead Dipindahkan ke Follow Up",
@@ -899,6 +977,9 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Pindah ke Stage Lain</CardTitle>
+                <p className="text-sm text-slate-500 mt-1">
+                  Pilih stage tujuan dari funnel manapun dalam brand ini
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -908,31 +989,23 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                       <SelectValue placeholder="Pilih stage..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {followUpStages.length > 0 && (
-                        <>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50">
-                            Follow Up Funnel
+                      {funnels.map((funnel) => {
+                        const funnelStages = stages.filter(s => s.funnel_id === funnel.id);
+                        if (funnelStages.length === 0) return null;
+                        
+                        return (
+                          <div key={funnel.id}>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                              {funnel.name} ({funnel.funnel_type === "follow_up" ? "Follow Up" : "Broadcast"})
+                            </div>
+                            {funnelStages.map((stage) => (
+                              <SelectItem key={stage.id} value={stage.id}>
+                                Stage {stage.stage_number}: {stage.stage_name}
+                              </SelectItem>
+                            ))}
                           </div>
-                          {followUpStages.map((stage) => (
-                            <SelectItem key={stage.id} value={stage.id}>
-                              Stage {stage.stage_number}: {stage.stage_name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                      
-                      {broadcastStages.length > 0 && (
-                        <>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 mt-2">
-                            Broadcast Funnel
-                          </div>
-                          {broadcastStages.map((stage) => (
-                            <SelectItem key={stage.id} value={stage.id}>
-                              Stage {stage.stage_number}: {stage.stage_name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -952,7 +1025,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                   disabled={isSubmitting || !moveToStage}
                   className="w-full"
                 >
-                  Pindah Lead
+                  {isSubmitting ? "Memindahkan..." : "Pindah Lead"}
                 </Button>
               </CardContent>
             </Card>
