@@ -255,15 +255,17 @@ export const db = {
 
     getByFunnelId: async (funnelId: string) => {
       if (!isConnected) {
-        // Mock implementation for offline mode
-        return MOCK_LEADS
-          .map(lead => ({
-            ...lead,
-            source: MOCK_SOURCES.find(s => s.id === lead.source_id),
-            current_stage: [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES].find(s => s.id === lead.current_stage_id)
-          }));
         // Note: In real offline mode we'd filter by funnel_id but mock data doesn't have it yet
+        const mockFiltered = MOCK_LEADS.filter(l => l.brand_id === 'brand-1'); // Placeholder filter
+        return mockFiltered.map(lead => ({
+          ...lead,
+          source: MOCK_SOURCES.find(s => s.id === lead.source_id),
+          current_stage: [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES].find(s => s.id === lead.current_stage_id)
+        }));
       }
+      
+      console.log(`[db.leads.getByFunnelId] Fetching leads for funnel_id: ${funnelId}`);
+
       const { data, error } = await supabase
         .from("leads")
         .select(`
@@ -273,8 +275,24 @@ export const db = {
         `)
         .eq("funnel_id", funnelId)
         .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data;
+
+      if (error) {
+        console.error(`[db.leads.getByFunnelId] Error fetching leads for funnel ${funnelId}:`, error);
+        throw error;
+      }
+      
+      console.log(`[db.leads.getByFunnelId] Found ${data?.length || 0} leads for funnel ${funnelId}.`);
+
+      // Post-query check to be absolutely sure
+      if (data) {
+        const incorrectLeads = data.filter(lead => lead.funnel_id !== funnelId);
+        if (incorrectLeads.length > 0) {
+            console.warn(`[db.leads.getByFunnelId] WARNING: Query returned ${incorrectLeads.length} leads that do NOT match the requested funnelId '${funnelId}'.`);
+            console.warn('[db.leads.getByFunnelId] Incorrect leads sample:', incorrectLeads.map(l => ({id: l.id, funnel_id: l.funnel_id})));
+        }
+      }
+
+      return data || [];
     },
 
     async getByBrandId(brandId: string): Promise<Lead[]> {
