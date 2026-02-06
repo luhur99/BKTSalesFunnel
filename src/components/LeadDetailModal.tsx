@@ -92,19 +92,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     try {
       console.log("🔄 Loading lead data for brand:", lead.brand_id);
       
-      // FIX #1: Load ALL stages from ALL funnels in the brand (not just current funnel)
-      const { data: allStagesData, error: stagesError } = await supabase
-        .from("stages")
-        .select("*")
-        .eq("brand_id", lead.brand_id)
-        .order("funnel_type", { ascending: true })
-        .order("stage_number", { ascending: true });
-
-      if (stagesError) throw stagesError;
-      
-      console.log("✅ Loaded ALL stages from brand:", allStagesData?.length, "stages");
-
-      // FIX #1: Load ALL funnels from the brand for dropdown grouping
+      // FIX: Load funnels first to get funnel IDs (stages don't have brand_id)
       const { data: funnelsData, error: funnelsError } = await supabase
         .from("funnels")
         .select("id, name")
@@ -114,6 +102,28 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       if (funnelsError) throw funnelsError;
       
       console.log("✅ Loaded ALL funnels:", funnelsData?.length, "funnels");
+
+      // FIX: Extract funnel IDs to query stages
+      const funnelIds = funnelsData?.map(f => f.id) || [];
+      
+      if (funnelIds.length === 0) {
+        console.warn("⚠️ No funnels found for brand");
+        setStages([]);
+        setFunnels([]);
+        return;
+      }
+
+      // FIX: Load ALL stages from ALL funnels in the brand
+      const { data: allStagesData, error: stagesError } = await supabase
+        .from("stages")
+        .select("*")
+        .in("funnel_id", funnelIds)
+        .order("funnel_type", { ascending: true })
+        .order("stage_number", { ascending: true });
+
+      if (stagesError) throw stagesError;
+      
+      console.log("✅ Loaded ALL stages from brand funnels:", allStagesData?.length, "stages");
 
       const leadActivities = await db.activities.getByLead(lead.id);
       const leadHistory = await db.stageHistory.getByLead(lead.id);
