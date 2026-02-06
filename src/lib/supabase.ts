@@ -634,7 +634,7 @@ export const db = {
         console.log("✅ Lead updated successfully:", updatedLead);
         console.log("🎉 moveToStage - Operation completed successfully!");
         
-        // Fetch complete lead data with relations for UI
+        // CRITICAL FIX: Fetch complete lead data with relations for immediate UI update
         const { data: completeLeadData, error: fetchError } = await supabase
           .from("leads")
           .select(`

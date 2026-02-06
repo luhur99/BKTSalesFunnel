@@ -11,7 +11,6 @@ import { LeadSource, Stage, CustomLabel } from "@/types/lead";
 import { Loader2, X, Tag, Plus, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { getBrands } from "@/services/brandService";
 
 interface AddLeadModalProps {
   isOpen: boolean;
@@ -21,17 +20,10 @@ interface AddLeadModalProps {
   defaultFunnelId?: string;
 }
 
-export default function AddLeadModal({ 
-  isOpen, 
-  onClose, 
-  onLeadAdded,
-  defaultBrandId,
-  defaultFunnelId
-}: AddLeadModalProps) {
-  const [brands, setBrands] = useState<any[]>([]); // Add brands state if missing
+export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, defaultFunnelId }: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
-  const [availableLabels, setAvailableLabels] = useState<string[]>([]);
+  const [funnels, setFunnels] = useState<any[]>([]); // Added missing state
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +36,7 @@ export default function AddLeadModal({
     company: "",
     source_id: "",
     current_stage_id: "",
+    funnel_id: defaultFunnelId || "", // Added missing field
     status: "active",
     custom_labels: [] as string[],
     notes: "",
@@ -51,47 +44,64 @@ export default function AddLeadModal({
     date_in: new Date().toISOString().split('T')[0]
   });
 
+  // Load sources, funnels, and stages when modal opens
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    if (isOpen) {
+      loadInitialData();
+    }
+  }, [isOpen]);
+
+  // Load stages when funnel is selected
+  useEffect(() => {
+    if (formData.funnel_id) {
+      loadFunnelStages(formData.funnel_id);
+      loadLabelsForFunnel(formData.funnel_id);
+    } else {
+      setStages([]);
+      setFormData(prev => ({ ...prev, current_stage_id: "" }));
+    }
+  }, [formData.funnel_id]);
 
   const loadInitialData = async () => {
     try {
-      // Use defaultFunnelId from props if available
-      const funnelId = defaultFunnelId;
-      
-      const [brandsData, sourcesData, labelsData, stagesData] = await Promise.all([
-        getBrands(),
+      const [sourcesData, funnelsData] = await Promise.all([
         db.sources.getAll(),
-        // Fetch hybrid labels: global + funnel-specific (if funnel selected)
-        funnelId 
-          ? db.labels.getByFunnel(funnelId)
-          : db.labels.getAll(),
-        // Fetch stages for the funnel
-        funnelId
-          ? db.stages.getByFunnel(funnelId)
-          : db.stages.getAll()
+        defaultBrandId ? db.funnels.getByBrand(defaultBrandId) : Promise.resolve([])
       ]);
 
-      setBrands(brandsData);
-      setSources(sourcesData); // Fix: use setSources not setLeadSources
-      setCustomLabels(labelsData);
-      setStages(stagesData || []); // Add stages data
+      setSources(sourcesData || []);
+      setFunnels(funnelsData || []);
+
+      // If defaultFunnelId is provided, it's already set in formData initial state
+      // triggering the second useEffect
     } catch (error) {
       console.error("Error loading initial data:", error);
     }
   };
 
-  // Reload labels when funnel changes (if funnel selection is added later, for now just rely on defaultFunnelId)
-  useEffect(() => {
-    if (defaultFunnelId) {
-      loadLabelsForFunnel(defaultFunnelId);
-      loadStagesForFunnel(defaultFunnelId);
-    } else {
-      loadLabelsForFunnel(undefined);
-      loadStagesForFunnel(undefined);
+  const loadFunnelStages = async (funnelId: string) => {
+    try {
+      console.log("🔍 Loading stages for funnel:", funnelId);
+      const stagesData = await db.stages.getByFunnel(funnelId);
+      console.log("✅ Stages loaded:", stagesData);
+      setStages(stagesData || []);
+      
+      // Auto-select first follow-up stage if no stage selected
+      if (!formData.current_stage_id && stagesData && stagesData.length > 0) {
+        const firstFollowUpStage = stagesData.find(s => s.funnel_type === "follow_up");
+        if (firstFollowUpStage) {
+          setFormData(prev => ({ 
+            ...prev, 
+            current_stage_id: firstFollowUpStage.id,
+            current_funnel: "follow_up"
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error loading funnel stages:", error);
+      setStages([]);
     }
-  }, [defaultFunnelId]);
+  };
 
   const loadLabelsForFunnel = async (funnelId?: string) => {
     try {
@@ -101,17 +111,6 @@ export default function AddLeadModal({
       setCustomLabels(labelsData);
     } catch (error) {
       console.error("Error loading labels:", error);
-    }
-  };
-
-  const loadStagesForFunnel = async (funnelId?: string) => {
-    try {
-      const stagesData = funnelId 
-        ? await db.stages.getByFunnel(funnelId)
-        : await db.stages.getAll();
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Error loading stages:", error);
     }
   };
 
@@ -161,7 +160,8 @@ export default function AddLeadModal({
       if (!defaultBrandId) {
         throw new Error("Brand ID tidak ditemukan. Silakan refresh halaman.");
       }
-      if (!defaultFunnelId) {
+      const funnelIdToUse = formData.funnel_id || defaultFunnelId;
+      if (!funnelIdToUse) {
         throw new Error("Funnel ID tidak ditemukan. Silakan refresh halaman.");
       }
 
@@ -195,15 +195,15 @@ export default function AddLeadModal({
 
       // 2. Prepare Payload
       const payload = {
-        brand_id: defaultBrandId, // ✅ ADDED
-        funnel_id: defaultFunnelId, // ✅ ADDED
+        brand_id: defaultBrandId,
+        funnel_id: funnelIdToUse,
         name: formData.name.trim() || null,
         email: formData.email?.trim() || null,
         phone: formData.phone.trim(),
         company: formData.company?.trim() || null,
         source_id: formData.source_id,
         current_stage_id: stageId,
-        current_funnel: funnelType, // ✅ Using correct funnel type from stage
+        current_funnel: funnelType, 
         status: formData.status as any,
         custom_labels: formData.custom_labels,
         last_response_note: formData.notes?.trim() || null,
@@ -431,22 +431,19 @@ export default function AddLeadModal({
                 <Label>Custom Labels (Optional)</Label>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
                   {customLabels.map((label) => {
-                    // Check if label is selected using formData.custom_labels
                     const isSelected = formData.custom_labels.includes(label.id);
-                    const isGlobal = !label.funnel_id;
+                    // Labels are now always funnel-specific if funnel_id is present in context
                     
                     return (
                       <div
                         key={label.id}
                         onClick={() => {
                           if (isSelected) {
-                            // Remove label
                             setFormData(prev => ({
                               ...prev,
                               custom_labels: prev.custom_labels.filter(id => id !== label.id)
                             }));
                           } else {
-                            // Add label
                             setFormData(prev => ({
                               ...prev,
                               custom_labels: [...prev.custom_labels, label.id]
@@ -468,14 +465,6 @@ export default function AddLeadModal({
                         <span className="text-sm font-medium flex-1 truncate">
                           {label.name}
                         </span>
-                        {isGlobal && (
-                          <Badge 
-                            variant="outline" 
-                            className="text-[10px] px-1 py-0 h-4 bg-gray-100 text-gray-600"
-                          >
-                            Global
-                          </Badge>
-                        )}
                       </div>
                     );
                   })}

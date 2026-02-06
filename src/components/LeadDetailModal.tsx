@@ -18,7 +18,7 @@ interface LeadDetailModalProps {
   lead: Lead | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate: () => Promise<void>;
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
@@ -74,7 +74,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
     try {
       const [allStages, leadActivities, leadHistory, stageScript, allSources, customLabels] = await Promise.all([
-        db.stages.getAll(),
+        db.stages.getByFunnel(lead.funnel_id),
         db.activities.getByLead(lead.id),
         db.stageHistory.getByLead(lead.id),
         lead.current_stage_id ? db.scripts.getByStage(lead.current_stage_id) : Promise.resolve(null),
@@ -102,7 +102,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.email || "System";
       
-      // Get target stage info for better toast message
       const targetStage = stages.find(s => s.id === moveToStage);
       const fromStage = lead.current_stage;
       
@@ -116,14 +115,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: `${fromStage?.stage_name || 'Stage sebelumnya'} → ${targetStage?.stage_name || 'Stage baru'}`,
       });
       
-      // CRITICAL: Call onUpdate and WAIT for it to complete
       console.log("🔄 Calling onUpdate to refresh parent data...");
-      if (onUpdate) {
-        await onUpdate();
-      }
+      await onUpdate();
       console.log("✅ onUpdate completed, waiting before close...");
       
-      // Small delay to ensure React state updates propagate
       await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log("✅ Closing modal after successful update");
@@ -154,14 +149,13 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         created_by: "Sales User"
       });
       
-      // Update last_response_note on lead
       await db.leads.update(lead.id, {
         last_response_note: newActivity.description,
         updated_at: new Date().toISOString()
       });
       
       setNewActivity({ type: "note", description: "", response_received: false });
-      onUpdate();
+      await onUpdate();
       loadLeadData();
     } catch (error) {
       console.error("Error adding activity:", error);
@@ -207,14 +201,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: `${lead.current_stage?.stage_name || 'Stage sebelumnya'} (Follow Up) → ${firstBroadcastStage.stage_name} (Broadcast)`,
       });
 
-      // CRITICAL: Call onUpdate and WAIT for it to complete
       console.log("🔄 Calling onUpdate to refresh parent data...");
-      if (onUpdate) {
-        await onUpdate();
-      }
+      await onUpdate();
       console.log("✅ onUpdate completed, waiting before close...");
       
-      // Small delay to ensure React state updates propagate
       await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log("✅ Closing modal after successful update");
@@ -269,14 +259,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: `${lead.current_stage?.stage_name || 'Stage sebelumnya'} (Broadcast) → ${firstFollowUpStage.stage_name} (Follow Up)`,
       });
 
-      // CRITICAL: Call onUpdate and WAIT for it to complete
       console.log("🔄 Calling onUpdate to refresh parent data...");
-      if (onUpdate) {
-        await onUpdate();
-      }
+      await onUpdate();
       console.log("✅ onUpdate completed, waiting before close...");
       
-      // Small delay to ensure React state updates propagate
       await new Promise(resolve => setTimeout(resolve, 500));
       
       console.log("✅ Closing modal after successful update");
@@ -344,9 +330,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       });
       
       console.log("✅ Lead updated successfully");
-      onUpdate();
+      await onUpdate();
       
-      // Wait for state updates
       await new Promise(resolve => setTimeout(resolve, 500));
       onClose();
     } catch (error) {
@@ -359,7 +344,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
   if (!lead) return null;
 
-  // Group stages by funnel type for better dropdown organization
   const followUpStages = stages.filter(s => s.funnel_type === "follow_up");
   const broadcastStages = stages.filter(s => s.funnel_type === "broadcast");
   
@@ -572,7 +556,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                 <div>
                   <Label className="mb-2 block">Custom Labels</Label>
                   
-                  {/* Available Labels Quick Select */}
                   {availableLabels.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 rounded border">
                       {availableLabels.map((label) => (
@@ -588,7 +571,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                     </div>
                   )}
 
-                  {/* Add New Label */}
                   <div className="flex gap-2 mb-3">
                     <Input
                       value={labelInput}
@@ -601,7 +583,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                     </Button>
                   </div>
 
-                  {/* Selected Labels Display */}
                   <div className="flex flex-wrap gap-2">
                     {editForm.custom_labels.map((label) => (
                       <Badge key={label} variant="secondary" className="gap-1 pl-2">
