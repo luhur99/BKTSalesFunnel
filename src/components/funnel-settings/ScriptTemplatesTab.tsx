@@ -28,6 +28,7 @@ export function ScriptTemplatesTab({ funnelId }: ScriptTemplatesTabProps) {
   const [saving, setSaving] = useState(false);
   const [scriptText, setScriptText] = useState("");
   const [mediaLinks, setMediaLinks] = useState<string[]>([]);
+  const [currentScriptId, setCurrentScriptId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -69,9 +70,11 @@ export function ScriptTemplatesTab({ funnelId }: ScriptTemplatesTabProps) {
       if (script) {
         setScriptText(script.script_text || "");
         setMediaLinks(script.media_links || []);
+        setCurrentScriptId(script.id);
       } else {
         setScriptText("");
         setMediaLinks([]);
+        setCurrentScriptId(null);
       }
     } catch (error) {
       console.error("Error loading script:", error);
@@ -83,12 +86,21 @@ export function ScriptTemplatesTab({ funnelId }: ScriptTemplatesTabProps) {
 
     try {
       setSaving(true);
-      // Use upsert to handle both create and update
-      await (db.scripts as any).upsert({
+      
+      const scriptData = {
         stage_id: selectedStageId,
         script_text: scriptText,
         media_links: mediaLinks,
-      });
+      };
+
+      if (currentScriptId) {
+        // Update existing script
+        await db.scripts.update(currentScriptId, scriptData);
+      } else {
+        // Create new script
+        const newScript = await db.scripts.create(scriptData);
+        setCurrentScriptId(newScript.id);
+      }
       
       toast({ title: "Script template saved successfully" });
     } catch (error) {
