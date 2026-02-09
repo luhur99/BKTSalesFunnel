@@ -33,6 +33,16 @@ export interface Funnel {
   conversion_rate?: number;
   created_at: string;
   updated_at: string;
+
+  // Traffic & campaign metadata (per funnel)
+  traffic_platform?: string | null;
+  traffic_campaign_name?: string | null;
+  traffic_start_date?: string | null;
+  traffic_audience_behavior?: string | null;
+  traffic_audience_interest?: string | null;
+  traffic_keyword?: string | null;
+  traffic_goal_campaign?: string | null;
+  traffic_notes?: string | null;
   
   // Relations
   brand?: Brand;
@@ -66,6 +76,14 @@ export interface CreateFunnelInput {
   description?: string;
   is_default?: boolean;
   is_active?: boolean;
+  traffic_platform?: string | null;
+  traffic_campaign_name?: string | null;
+  traffic_start_date?: string | null;
+  traffic_audience_behavior?: string | null;
+  traffic_audience_interest?: string | null;
+  traffic_keyword?: string | null;
+  traffic_goal_campaign?: string | null;
+  traffic_notes?: string | null;
 }
 
 export interface UpdateFunnelInput {
@@ -73,6 +91,14 @@ export interface UpdateFunnelInput {
   description?: string;
   is_active?: boolean;
   is_default?: boolean;
+  traffic_platform?: string | null;
+  traffic_campaign_name?: string | null;
+  traffic_start_date?: string | null;
+  traffic_audience_behavior?: string | null;
+  traffic_audience_interest?: string | null;
+  traffic_keyword?: string | null;
+  traffic_goal_campaign?: string | null;
+  traffic_notes?: string | null;
 }
 
 export interface BrandStats {

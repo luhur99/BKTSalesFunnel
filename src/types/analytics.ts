@@ -45,6 +45,21 @@ export interface FunnelFlowStep {
   conversion_rate: number;
 }
 
+export interface FunnelJourneySummary {
+  funnel_id: string;
+  funnel_name: string;
+  total_leads: number;
+  active_leads: number;
+  won_count: number;
+  lost_count: number;
+  conversion_rate: number;
+  followup_active: number;
+  broadcast_active: number;
+  switches_to_broadcast: number;
+  switches_to_followup: number;
+  avg_journey_days: number;
+}
+
 // Funnel Performance Comparison
 export interface FunnelPerformanceComparison {
   funnel_id: string;

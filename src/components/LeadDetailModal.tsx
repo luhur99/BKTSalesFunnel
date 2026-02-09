@@ -35,6 +35,7 @@ interface EditFormState {
   status: string;
   custom_labels: string[];
   deal_value: string | number;
+  created_at: string;
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
@@ -67,7 +68,23 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     status: "active",
     custom_labels: [],
     deal_value: "",
+    created_at: "",
   });
+
+  const toDateInputValue = (dateString: string | null | undefined) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const toIsoDateStart = (dateInputValue: string) => {
+    const [year, month, day] = dateInputValue.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+  };
 
   useEffect(() => {
     if (lead) {
@@ -82,6 +99,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         status: lead.status || "active",
         custom_labels: lead.custom_labels || [],
         deal_value: lead.deal_value ? String(lead.deal_value) : "",
+        created_at: toDateInputValue(lead.created_at),
       });
     }
   }, [lead]);
@@ -411,6 +429,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
     try {
       setIsSubmitting(true);
+
+      const createdAtIso = editForm.created_at
+        ? toIsoDateStart(editForm.created_at)
+        : null;
       
       await db.leads.update(lead.id, {
         name: editForm.name.trim() || null,
@@ -421,6 +443,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         status: editForm.status as any,
         custom_labels: editForm.custom_labels,
         deal_value: editForm.deal_value ? Number(editForm.deal_value) : null,
+        ...(createdAtIso ? { created_at: createdAtIso } : {}),
         updated_at: new Date().toISOString()
       });
       
@@ -634,6 +657,19 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                         <SelectItem value="lost">Lost</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-created-at">Date In</Label>
+                    <Input
+                      id="edit-created-at"
+                      type="date"
+                      value={editForm.created_at}
+                      onChange={(e) => setEditForm({ ...editForm, created_at: e.target.value })}
+                      max={new Date().toISOString().slice(0, 10)}
+                    />
                   </div>
                 </div>
 

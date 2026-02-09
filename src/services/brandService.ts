@@ -293,6 +293,14 @@ export async function createFunnel(input: CreateFunnelInput): Promise<Funnel> {
       is_default: input.is_default || false,
       is_active: true,
       total_leads_count: 0,
+      traffic_platform: input.traffic_platform || null,
+      traffic_campaign_name: input.traffic_campaign_name || null,
+      traffic_start_date: input.traffic_start_date || null,
+      traffic_audience_behavior: input.traffic_audience_behavior || null,
+      traffic_audience_interest: input.traffic_audience_interest || null,
+      traffic_keyword: input.traffic_keyword || null,
+      traffic_goal_campaign: input.traffic_goal_campaign || null,
+      traffic_notes: input.traffic_notes || null,
     })
     .select()
     .single();

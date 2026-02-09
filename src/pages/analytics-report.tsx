@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { db } from "@/lib/supabase";
 import { brandService } from "@/services/brandService";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep } from "@/types/analytics";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep, FunnelJourneySummary } from "@/types/analytics";
 import { Brand, Funnel } from "@/types/brand";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
@@ -11,6 +11,7 @@ import { BottleneckWarnings } from "@/components/analytics/BottleneckWarnings";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
 import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +33,17 @@ interface HeatmapCell {
   intensity: "low" | "medium" | "high" | "none";
 }
 
+interface FunnelJourneyReportRow extends FunnelJourneySummary {
+  traffic_platform: string | null;
+  traffic_campaign_name: string | null;
+  traffic_start_date: string | null;
+  traffic_audience_behavior: string | null;
+  traffic_audience_interest: string | null;
+  traffic_keyword: string | null;
+  traffic_goal_campaign: string | null;
+  traffic_notes: string | null;
+}
+
 export default function AnalyticsReportPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -49,6 +61,7 @@ export default function AnalyticsReportPage() {
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
   const [funnelFlowData, setFunnelFlowData] = useState<FunnelFlowStep[]>([]);
+  const [journeySummaries, setJourneySummaries] = useState<FunnelJourneyReportRow[]>([]);
 
   useEffect(() => {
     // Check authentication
@@ -126,6 +139,7 @@ export default function AnalyticsReportPage() {
       setHeatmapData([]);
       setBottleneckWarnings([]);
       setFunnelFlowData([]);
+      setJourneySummaries([]);
       
       // Fetch leakage stats for each funnel in the brand
       let leakageStatsData: Array<FunnelLeakageStats & { funnel_name: string }> = [];
@@ -149,6 +163,34 @@ export default function AnalyticsReportPage() {
       }
       
       setFunnelLeakageStats(leakageStatsData);
+
+      // Fetch unified journey summaries per funnel
+      const funnelsToSummarize = funnelId
+        ? funnelsList.filter(f => f.id === funnelId)
+        : funnelsList;
+
+      const summaryResults = await Promise.all(
+        funnelsToSummarize.map(async (funnel) => {
+          const summary = await db.analytics.getFunnelJourneySummary(funnel.id);
+          if (!summary) return null;
+          return {
+            ...summary,
+            funnel_name: funnel.name,
+            traffic_platform: funnel.traffic_platform || null,
+            traffic_campaign_name: funnel.traffic_campaign_name || null,
+            traffic_start_date: funnel.traffic_start_date || null,
+            traffic_audience_behavior: funnel.traffic_audience_behavior || null,
+            traffic_audience_interest: funnel.traffic_audience_interest || null,
+            traffic_keyword: funnel.traffic_keyword || null,
+            traffic_goal_campaign: funnel.traffic_goal_campaign || null,
+            traffic_notes: funnel.traffic_notes || null,
+          };
+        })
+      );
+
+      setJourneySummaries(
+        summaryResults.filter((s): s is FunnelJourneyReportRow => s !== null)
+      );
 
       // Fetch other analytics data in parallel
       const [velocity, heatmap, warnings, funnelFlow] = await Promise.allSettled([
@@ -213,6 +255,17 @@ export default function AnalyticsReportPage() {
         };
       })
     : [];
+
+  const formatShortDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+  };
 
   if (loading && funnelLeakageStats.length === 0) { // Only show full skeleton on initial load
     return (
@@ -347,6 +400,101 @@ export default function AnalyticsReportPage() {
           }
           return null;
         })()}
+
+        {journeySummaries.length > 0 && (
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Unified Funnel Journey Report</h2>
+                <p className="text-sm text-gray-600">
+                  Perjalanan lead sebagai satu kesatuan (Follow Up + Broadcast) dan metadata iklan
+                </p>
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Journey + Traffic Summary</CardTitle>
+                <CardDescription>
+                  Bandingkan funnel dan iklan mana yang paling konversi
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Funnel</TableHead>
+                        <TableHead>Traffic</TableHead>
+                        <TableHead>Audience</TableHead>
+                        <TableHead>Keyword</TableHead>
+                        <TableHead>Goal</TableHead>
+                        <TableHead className="text-right">Leads</TableHead>
+                        <TableHead className="text-right">Win</TableHead>
+                        <TableHead className="text-right">Lost</TableHead>
+                        <TableHead className="text-right">Conv %</TableHead>
+                        <TableHead className="text-right">FU→BC</TableHead>
+                        <TableHead className="text-right">BC→FU</TableHead>
+                        <TableHead className="text-right">Avg Days</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {journeySummaries.map((row) => (
+                        <TableRow key={row.funnel_id}>
+                          <TableCell className="font-medium">{row.funnel_name}</TableCell>
+                          <TableCell>
+                            <div className="text-sm font-medium">
+                              {row.traffic_platform || "-"}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {row.traffic_campaign_name || "-"}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {formatShortDate(row.traffic_start_date)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{row.traffic_audience_behavior || "-"}</div>
+                            <div className="text-xs text-slate-500">{row.traffic_audience_interest || "-"}</div>
+                          </TableCell>
+                          <TableCell>{row.traffic_keyword || "-"}</TableCell>
+                          <TableCell>{row.traffic_goal_campaign || "-"}</TableCell>
+                          <TableCell className="text-right">{row.total_leads}</TableCell>
+                          <TableCell className="text-right">{row.won_count}</TableCell>
+                          <TableCell className="text-right">{row.lost_count}</TableCell>
+                          <TableCell className="text-right">{row.conversion_rate.toFixed(1)}</TableCell>
+                          <TableCell className="text-right">{row.switches_to_broadcast}</TableCell>
+                          <TableCell className="text-right">{row.switches_to_followup}</TableCell>
+                          <TableCell className="text-right">{row.avg_journey_days.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {journeySummaries.some((row) => row.traffic_notes) && (
+                  <div className="mt-6 space-y-2">
+                    <div className="text-sm font-semibold text-slate-700">Catatan Funnel</div>
+                    <div className="space-y-2">
+                      {journeySummaries
+                        .filter((row) => row.traffic_notes)
+                        .map((row) => (
+                          <div key={`${row.funnel_id}-note`} className="text-sm text-slate-600">
+                            <span className="font-medium text-slate-800">{row.funnel_name}:</span>{" "}
+                            {row.traffic_notes}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Separator className="my-8" />
+          </section>
+        )}
 
         {/* Bottleneck Warnings */}
         {bottleneckWarnings.length > 0 && (

@@ -909,6 +909,79 @@ export const db = {
       return data;
     },
 
+    getFunnelJourneySummary: async (funnelId: string) => {
+      if (!isConnected) {
+        return {
+          funnel_id: funnelId,
+          funnel_name: "Mock Funnel",
+          total_leads: 120,
+          active_leads: 70,
+          won_count: 30,
+          lost_count: 20,
+          conversion_rate: 25,
+          followup_active: 50,
+          broadcast_active: 20,
+          switches_to_broadcast: 18,
+          switches_to_followup: 9,
+          avg_journey_days: 12.4
+        };
+      }
+
+      const { data: leads, error: leadsError } = await supabase
+        .from("leads")
+        .select("id, status, created_at, current_funnel")
+        .eq("funnel_id", funnelId);
+
+      if (leadsError) {
+        console.error("Error fetching leads for funnel summary:", leadsError);
+        return null;
+      }
+
+      const { data: history, error: historyError } = await supabase
+        .from("lead_stage_history")
+        .select("from_funnel, to_funnel, lead:leads!inner(funnel_id)")
+        .eq("lead.funnel_id", funnelId);
+
+      if (historyError) {
+        console.error("Error fetching stage history for funnel summary:", historyError);
+        return null;
+      }
+
+      const totalLeads = leads?.length || 0;
+      const wonCount = (leads || []).filter(l => l.status === "deal").length;
+      const lostCount = (leads || []).filter(l => l.status === "lost").length;
+      const activeLeads = (leads || []).filter(l => l.status === "active").length;
+      const followupActive = (leads || []).filter(l => l.current_funnel === "follow_up").length;
+      const broadcastActive = (leads || []).filter(l => l.current_funnel === "broadcast").length;
+
+      const switchesToBroadcast = (history || []).filter(h => h.from_funnel === "follow_up" && h.to_funnel === "broadcast").length;
+      const switchesToFollowup = (history || []).filter(h => h.from_funnel === "broadcast" && h.to_funnel === "follow_up").length;
+
+      const now = Date.now();
+      const totalDays = (leads || []).reduce((sum, lead) => {
+        if (!lead.created_at) return sum;
+        const diffMs = now - new Date(lead.created_at).getTime();
+        return sum + diffMs / (1000 * 60 * 60 * 24);
+      }, 0);
+
+      const avgJourneyDays = totalLeads > 0 ? totalDays / totalLeads : 0;
+
+      return {
+        funnel_id: funnelId,
+        funnel_name: "",
+        total_leads: totalLeads,
+        active_leads: activeLeads,
+        won_count: wonCount,
+        lost_count: lostCount,
+        conversion_rate: totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0,
+        followup_active: followupActive,
+        broadcast_active: broadcastActive,
+        switches_to_broadcast: switchesToBroadcast,
+        switches_to_followup: switchesToFollowup,
+        avg_journey_days: Math.round(avgJourneyDays * 100) / 100
+      };
+    },
+
     // NEW: Funnel Leakage Stats
     getFunnelLeakageStats: async (funnelId?: string): Promise<FunnelLeakageStats> => {
       if (!isConnected) {

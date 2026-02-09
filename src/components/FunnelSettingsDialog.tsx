@@ -11,6 +11,7 @@ import { Funnel } from "@/types/brand";
 import { FunnelStagesTab } from "./funnel-settings/FunnelStagesTab";
 import { ScriptTemplatesTab } from "./funnel-settings/ScriptTemplatesTab";
 import { CustomLabelsTab } from "./funnel-settings/CustomLabelsTab";
+import { TrafficSettingsTab } from "./funnel-settings/TrafficSettingsTab";
 
 interface FunnelSettingsDialogProps {
   funnel: Funnel;
@@ -38,10 +39,11 @@ export function FunnelSettingsDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="stages">Funnel Stages</TabsTrigger>
             <TabsTrigger value="scripts">Script Templates</TabsTrigger>
             <TabsTrigger value="labels">Custom Labels</TabsTrigger>
+            <TabsTrigger value="traffic">Traffic & Campaign</TabsTrigger>
           </TabsList>
 
           <div className="flex-1 overflow-auto mt-4">
@@ -55,6 +57,10 @@ export function FunnelSettingsDialog({
 
             <TabsContent value="labels" className="h-full m-0">
               <CustomLabelsTab funnelId={funnel.id} onUpdate={onUpdate} />
+            </TabsContent>
+
+            <TabsContent value="traffic" className="h-full m-0">
+              <TrafficSettingsTab funnel={funnel} onUpdate={onUpdate} />
             </TabsContent>
           </div>
         </Tabs>

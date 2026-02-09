@@ -115,6 +115,14 @@ export type Database = {
           is_default: boolean | null
           name: string
           total_leads_count: number | null
+          traffic_audience_behavior: string | null
+          traffic_audience_interest: string | null
+          traffic_campaign_name: string | null
+          traffic_goal_campaign: string | null
+          traffic_keyword: string | null
+          traffic_notes: string | null
+          traffic_platform: string | null
+          traffic_start_date: string | null
           updated_at: string | null
         }
         Insert: {
@@ -127,6 +135,14 @@ export type Database = {
           is_default?: boolean | null
           name: string
           total_leads_count?: number | null
+          traffic_audience_behavior?: string | null
+          traffic_audience_interest?: string | null
+          traffic_campaign_name?: string | null
+          traffic_goal_campaign?: string | null
+          traffic_keyword?: string | null
+          traffic_notes?: string | null
+          traffic_platform?: string | null
+          traffic_start_date?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -139,6 +155,14 @@ export type Database = {
           is_default?: boolean | null
           name?: string
           total_leads_count?: number | null
+          traffic_audience_behavior?: string | null
+          traffic_audience_interest?: string | null
+          traffic_campaign_name?: string | null
+          traffic_goal_campaign?: string | null
+          traffic_keyword?: string | null
+          traffic_notes?: string | null
+          traffic_platform?: string | null
+          traffic_start_date?: string | null
           updated_at?: string | null
         }
         Relationships: [
