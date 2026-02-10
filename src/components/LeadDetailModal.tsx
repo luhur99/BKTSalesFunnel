@@ -159,7 +159,11 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
 
       setStages(allStagesData || []);
       setFunnels(funnelsData || []);
-      setActivities(leadActivities || []);
+      const normalizedActivities = (leadActivities || []).map((activity: any) => ({
+        ...activity,
+        activity_type: activity.activity_type as ActivityType,
+      }));
+      setActivities(normalizedActivities);
       setStageHistory(leadHistory || []);
       setScript(stageScript);
       setSources(allSources || []);
