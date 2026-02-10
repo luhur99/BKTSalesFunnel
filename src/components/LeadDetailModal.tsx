@@ -9,9 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity, Globe, Tag, Edit2, X, Plus } from "lucide-react";
-import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory, LeadSource } from "@/types/lead";
-import { db } from "@/lib/supabase";
-import { supabase } from "@/integrations/supabase/client";
+import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory, LeadSource, CustomLabel } from "@/types/lead";
+import { db, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 interface LeadDetailModalProps {
@@ -46,7 +45,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   const [stageHistory, setStageHistory] = useState<LeadStageHistory[]>([]);
   const [script, setScript] = useState<StageScript | null>(null);
   const [sources, setSources] = useState<LeadSource[]>([]);
-  const [availableLabels, setAvailableLabels] = useState<string[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<CustomLabel[]>([]);
   const [moveToStage, setMoveToStage] = useState("");
   const [moveNotes, setMoveNotes] = useState("");
   const [moveReason, setMoveReason] = useState("manual_move");
@@ -84,6 +83,15 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     const [year, month, day] = dateInputValue.split("-").map(Number);
     if (!year || !month || !day) return null;
     return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
+  };
+
+  const resolveLabelName = (value: string) => {
+    return availableLabels.find(label => label.id === value)?.name || value;
+  };
+
+  const findLabelIdByName = (name: string) => {
+    const normalized = name.trim().toLowerCase();
+    return availableLabels.find(label => label.name.toLowerCase() === normalized)?.id;
   };
 
   useEffect(() => {
@@ -155,7 +163,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       setStageHistory(leadHistory || []);
       setScript(stageScript);
       setSources(allSources || []);
-      setAvailableLabels(customLabels?.map((l: any) => l.name) || []);
+      setAvailableLabels(customLabels || []);
     } catch (error) {
       console.error("Error loading lead data:", error);
     }
@@ -394,25 +402,29 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
   };
 
   const handleAddLabel = () => {
-    if (labelInput.trim() && !editForm.custom_labels.includes(labelInput.trim())) {
+    const trimmed = labelInput.trim();
+    if (!trimmed) return;
+    const existingId = findLabelIdByName(trimmed) || availableLabels.find(label => label.id === trimmed)?.id;
+    const valueToStore = existingId || trimmed;
+    if (!editForm.custom_labels.includes(valueToStore)) {
       setEditForm({ 
         ...editForm, 
-        custom_labels: [...editForm.custom_labels, labelInput.trim()] 
+        custom_labels: [...editForm.custom_labels, valueToStore] 
       });
       setLabelInput("");
     }
   };
 
-  const handleToggleLabel = (label: string) => {
-    if (editForm.custom_labels.includes(label)) {
+  const handleToggleLabel = (labelId: string) => {
+    if (editForm.custom_labels.includes(labelId)) {
       setEditForm({
         ...editForm,
-        custom_labels: editForm.custom_labels.filter(l => l !== label)
+        custom_labels: editForm.custom_labels.filter(l => l !== labelId)
       });
     } else {
       setEditForm({
         ...editForm,
-        custom_labels: [...editForm.custom_labels, label]
+        custom_labels: [...editForm.custom_labels, labelId]
       });
     }
   };
@@ -539,7 +551,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                   <Tag className="w-4 h-4 text-slate-400" />
                   {lead.custom_labels.map((label, idx) => (
                     <Badge key={idx} variant="secondary" className="gap-1">
-                      {label}
+                      {resolveLabelName(label)}
                     </Badge>
                   ))}
                 </div>
@@ -691,12 +703,12 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                     <div className="flex flex-wrap gap-2 mb-3 p-3 bg-slate-50 rounded border">
                       {availableLabels.map((label) => (
                         <Badge
-                          key={label}
-                          variant={editForm.custom_labels.includes(label) ? "default" : "outline"}
+                          key={label.id}
+                          variant={editForm.custom_labels.includes(label.id) ? "default" : "outline"}
                           className="cursor-pointer hover:bg-primary/90"
-                          onClick={() => handleToggleLabel(label)}
+                          onClick={() => handleToggleLabel(label.id)}
                         >
-                          {label}
+                          {label.name}
                         </Badge>
                       ))}
                     </div>
@@ -718,7 +730,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
                     {editForm.custom_labels.map((label) => (
                       <Badge key={label} variant="secondary" className="gap-1 pl-2">
                         <Tag className="h-3 w-3" />
-                        {label}
+                        {resolveLabelName(label)}
                         <button 
                           type="button" 
                           onClick={() => handleRemoveLabel(label)}

@@ -3,7 +3,7 @@
  * Display funnel with stats and actions
  */
 
-import { ArrowRight, Users, TrendingUp, Trash2 } from "lucide-react";
+import { ArrowRight, Users, TrendingUp, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,20 +18,46 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Funnel } from "@/types/brand";
+import type { CustomLabel } from "@/types/lead";
 import { useState } from "react";
 import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { EditFunnelModal } from "@/components/EditFunnelModal";
 
 interface FunnelCardProps {
   funnel: Funnel;
   brandColor: string;
+  labels?: CustomLabel[];
   onSelect: (funnelId: string) => void;
   onDelete?: () => void;
+  onUpdated?: () => void;
 }
 
-export function FunnelCard({ funnel, brandColor, onSelect, onDelete }: FunnelCardProps) {
+const LABEL_COLOR_CLASSES: Record<string, string> = {
+  red: "bg-red-50 text-red-700 border-red-200",
+  orange: "bg-orange-50 text-orange-700 border-orange-200",
+  amber: "bg-amber-50 text-amber-700 border-amber-200",
+  yellow: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  lime: "bg-lime-50 text-lime-700 border-lime-200",
+  green: "bg-green-50 text-green-700 border-green-200",
+  emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  teal: "bg-teal-50 text-teal-700 border-teal-200",
+  cyan: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  sky: "bg-sky-50 text-sky-700 border-sky-200",
+  blue: "bg-blue-50 text-blue-700 border-blue-200",
+  indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  violet: "bg-violet-50 text-violet-700 border-violet-200",
+  purple: "bg-purple-50 text-purple-700 border-purple-200",
+  fuchsia: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  pink: "bg-pink-50 text-pink-700 border-pink-200",
+  rose: "bg-rose-50 text-rose-700 border-rose-200",
+  slate: "bg-slate-50 text-slate-700 border-slate-200",
+};
+
+export function FunnelCard({ funnel, brandColor, labels = [], onSelect, onDelete, onUpdated }: FunnelCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const { toast } = useToast();
 
   const handleDelete = async () => {
@@ -77,12 +103,32 @@ export function FunnelCard({ funnel, brandColor, onSelect, onDelete }: FunnelCar
                 {funnel.description}
               </CardDescription>
             )}
+            {labels.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {labels.map((label) => (
+                  <span
+                    key={label.id}
+                    className={`text-xs border rounded-full px-2 py-0.5 ${LABEL_COLOR_CLASSES[label.color] || "bg-slate-50 text-slate-700 border-slate-200"}`}
+                  >
+                    {label.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 ml-2">
             <div 
               className="w-3 h-3 rounded-full flex-shrink-0"
               style={{ backgroundColor: brandColor }}
             />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+              onClick={() => setShowEditModal(true)}
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
               <AlertDialogTrigger asChild>
                 <Button
@@ -161,6 +207,15 @@ export function FunnelCard({ funnel, brandColor, onSelect, onDelete }: FunnelCar
           <ArrowRight className="w-4 h-4" />
         </Button>
       </CardContent>
+
+      {showEditModal && (
+        <EditFunnelModal
+          funnel={funnel}
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          onUpdated={onUpdated}
+        />
+      )}
     </Card>
   );
 }

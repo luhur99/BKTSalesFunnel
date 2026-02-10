@@ -72,6 +72,10 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
       setSources(sourcesData || []);
       setFunnels(funnelsData || []);
 
+      if (!formData.source_id && sourcesData && sourcesData.length > 0) {
+        setFormData(prev => ({ ...prev, source_id: sourcesData[0].id }));
+      }
+
       // If defaultFunnelId is provided, it's already set in formData initial state
       // triggering the second useEffect
     } catch (error) {
@@ -165,13 +169,9 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
         throw new Error("Funnel ID tidak ditemukan. Silakan refresh halaman.");
       }
 
-      if (!formData.source_id) {
-        // Try to set default source if missing
-        if (sources.length > 0) {
-          formData.source_id = sources[0].id;
-        } else {
-          throw new Error("Lead Source wajib dipilih!");
-        }
+      const sourceId = formData.source_id || sources[0]?.id;
+      if (!sourceId) {
+        throw new Error("Lead Source wajib dipilih!");
       }
 
       // Ensure stage is set
@@ -201,7 +201,7 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
         email: formData.email?.trim() || null,
         phone: formData.phone.trim(),
         company: formData.company?.trim() || null,
-        source_id: formData.source_id,
+        source_id: sourceId,
         current_stage_id: stageId,
         current_funnel: funnelType, 
         status: formData.status as any,

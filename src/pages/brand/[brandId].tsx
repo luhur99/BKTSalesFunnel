@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { FunnelCard } from "@/components/FunnelCard";
 import { AddFunnelModal } from "@/components/AddFunnelModal";
 import { Brand, Funnel, CreateFunnelInput } from "@/types/brand";
+import type { CustomLabel } from "@/types/lead";
 import { brandService } from "@/services/brandService";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/supabase";
 
 export default function BrandPage() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export default function BrandPage() {
   const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [funnelLabels, setFunnelLabels] = useState<Record<string, CustomLabel[]>>({});
 
   useEffect(() => {
     // Check authentication
@@ -58,6 +61,7 @@ export default function BrandPage() {
       console.log("✅ Funnels loaded:", funnelsData.length, "funnels");
       console.log("📊 Funnel details:", funnelsData);
       setFunnels(funnelsData);
+      await loadFunnelLabels(funnelsData);
 
     } catch (error) {
       console.error("❌ Error loading brand data:", error);
@@ -96,6 +100,28 @@ export default function BrandPage() {
 
   const handleSelectFunnel = (funnelId: string) => {
     router.push(`/brand/${brandId}/funnel/${funnelId}`);
+  };
+
+  const loadFunnelLabels = async (funnelsData: Funnel[]) => {
+    if (funnelsData.length === 0) {
+      setFunnelLabels({});
+      return;
+    }
+
+    try {
+      const entries = await Promise.all(
+        funnelsData.map(async (funnel) => {
+          const labels = await db.labels.getByFunnel(funnel.id);
+          const funnelOnly = labels.filter((label: CustomLabel) => label.funnel_id === funnel.id);
+          return [funnel.id, funnelOnly] as const;
+        })
+      );
+
+      setFunnelLabels(Object.fromEntries(entries));
+    } catch (error) {
+      console.error("Error loading funnel labels:", error);
+      setFunnelLabels({});
+    }
   };
 
   // Calculate total leads across all funnels
@@ -240,8 +266,10 @@ export default function BrandPage() {
                   key={funnel.id}
                   funnel={funnel}
                   brandColor={brand.color}
+                  labels={funnelLabels[funnel.id] || []}
                   onSelect={handleSelectFunnel}
                   onDelete={() => loadBrandData(brandId as string)}
+                  onUpdated={() => loadBrandData(brandId as string)}
                 />
               ))}
             </div>

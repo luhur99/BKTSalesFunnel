@@ -78,6 +78,10 @@ export function LeadListView({ leads, funnelType, brandId, funnelId, stages, onU
   };
 
   const handleEditClick = (lead: Lead) => {
+    if (onLeadClick) {
+      onLeadClick(lead);
+      return;
+    }
     setSelectedLead(lead);
     setShowDetailModal(true);
   };

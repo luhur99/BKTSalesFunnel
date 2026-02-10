@@ -125,10 +125,15 @@ export function FunnelStagesTab({ funnelId, onUpdate }: FunnelStagesTabProps) {
     const swapStage = sameTypeStages[swapIndex];
 
     try {
-      await Promise.all([
-        db.stages.update(stage.id, { stage_number: swapStage.stage_number }),
-        db.stages.update(swapStage.id, { stage_number: stage.stage_number }),
-      ]);
+      const maxStageNumber = Math.max(
+        ...sameTypeStages.map((s) => s.stage_number),
+        0
+      );
+      const tempStageNumber = maxStageNumber + 1;
+
+      await db.stages.update(stage.id, { stage_number: tempStageNumber });
+      await db.stages.update(swapStage.id, { stage_number: stage.stage_number });
+      await db.stages.update(stage.id, { stage_number: swapStage.stage_number });
 
       toast({ title: "Stage order updated" });
       loadStages();
