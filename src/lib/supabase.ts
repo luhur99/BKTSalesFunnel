@@ -7,7 +7,12 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-export const isConnected = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL !== "your-project-url";
+export const isConnected =
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "your-project-url" &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://placeholder.supabase.co" &&
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY !== "placeholder";
 
 // Mock Data
 const MOCK_SOURCES: LeadSource[] = [
@@ -139,6 +144,7 @@ export const db = {
 
   stages: {
     async getByFunnel(funnelId: string): Promise<Stage[]> {
+      if (!isConnected) return [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES];
       // Get funnel-specific stages OR global templates (funnel_id IS NULL)
       const { data, error } = await supabase
         .from("stages")
@@ -173,6 +179,7 @@ export const db = {
     },
 
     async getAll(): Promise<Stage[]> {
+      if (!isConnected) return [...MOCK_FOLLOW_UP_STAGES, ...MOCK_BROADCAST_STAGES];
       // Get all stages (both global and funnel-specific)
       const { data, error } = await supabase
         .from("stages")
