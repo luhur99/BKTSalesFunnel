@@ -1080,7 +1080,10 @@ export const db = {
         console.error("Error fetching stage velocity:", error);
         return [];
       }
-      return data || [];
+      return (data || []).map((row: any) => ({
+        ...row,
+        avg_hours: row.avg_hours != null ? String(row.avg_hours) : "0",
+      }));
     },
 
     // NEW: Heatmap Analytics
