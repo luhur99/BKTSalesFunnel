@@ -220,12 +220,12 @@ export function CustomLabelsTab({ funnelId, onUpdate }: CustomLabelsTabProps) {
                 key={label.id}
                 className={cn(
                   "flex items-center justify-between p-2 rounded-md border bg-card opacity-80",
-                  `border-${label.color}-200 bg-${label.color}-50`
+                  LABEL_COLOR_CLASSES[label.color] || "bg-slate-50 text-slate-700 border-slate-200"
                 )}
               >
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <Globe className={cn("w-3 h-3 flex-shrink-0", `text-${label.color}-600`)} />
-                  <span className={cn("text-sm font-medium truncate", `text-${label.color}-900`)}>
+                  <Globe className="w-3 h-3 flex-shrink-0" style={{ color: COLOR_HEX[label.color] }} />
+                  <span className="text-sm font-medium truncate">
                     {label.name}
                   </span>
                 </div>

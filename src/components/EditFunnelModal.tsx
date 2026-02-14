@@ -19,6 +19,48 @@ const PRESET_COLORS = [
   "pink", "rose", "slate"
 ];
 
+const COLOR_HEX: Record<string, string> = {
+  red: "#ef4444",
+  orange: "#f97316",
+  amber: "#f59e0b",
+  yellow: "#eab308",
+  lime: "#84cc16",
+  green: "#22c55e",
+  emerald: "#10b981",
+  teal: "#14b8a6",
+  cyan: "#06b6d4",
+  sky: "#0ea5e9",
+  blue: "#3b82f6",
+  indigo: "#6366f1",
+  violet: "#8b5cf6",
+  purple: "#a855f7",
+  fuchsia: "#d946ef",
+  pink: "#ec4899",
+  rose: "#f43f5e",
+  slate: "#64748b",
+};
+
+const LABEL_COLOR_CLASSES: Record<string, string> = {
+  red: "bg-red-50 text-red-700 border-red-200",
+  orange: "bg-orange-50 text-orange-700 border-orange-200",
+  amber: "bg-amber-50 text-amber-700 border-amber-200",
+  yellow: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  lime: "bg-lime-50 text-lime-700 border-lime-200",
+  green: "bg-green-50 text-green-700 border-green-200",
+  emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  teal: "bg-teal-50 text-teal-700 border-teal-200",
+  cyan: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  sky: "bg-sky-50 text-sky-700 border-sky-200",
+  blue: "bg-blue-50 text-blue-700 border-blue-200",
+  indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  violet: "bg-violet-50 text-violet-700 border-violet-200",
+  purple: "bg-purple-50 text-purple-700 border-purple-200",
+  fuchsia: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  pink: "bg-pink-50 text-pink-700 border-pink-200",
+  rose: "bg-rose-50 text-rose-700 border-rose-200",
+  slate: "bg-slate-50 text-slate-700 border-slate-200",
+};
+
 interface EditFunnelModalProps {
   funnel: Funnel;
   isOpen: boolean;
@@ -202,9 +244,9 @@ export function EditFunnelModal({ funnel, isOpen, onClose, onUpdated }: EditFunn
                         type="button"
                         className={cn(
                           "w-6 h-6 rounded-full border border-gray-200 transition-all",
-                          `bg-${color}-500`,
                           labelForm.color === color ? "ring-2 ring-offset-2 ring-black scale-110" : "hover:scale-110"
                         )}
+                        style={{ backgroundColor: COLOR_HEX[color] }}
                         onClick={() => setLabelForm({ ...labelForm, color })}
                         title={color}
                       />
@@ -241,7 +283,7 @@ export function EditFunnelModal({ funnel, isOpen, onClose, onUpdated }: EditFunn
                       key={label.id}
                       className={cn(
                         "inline-flex items-center gap-2 text-xs border rounded-full px-2 py-0.5",
-                        `border-${label.color}-200 bg-${label.color}-50 text-${label.color}-700`
+                        LABEL_COLOR_CLASSES[label.color] || "bg-slate-50 text-slate-700 border-slate-200"
                       )}
                     >
                       {label.name}
