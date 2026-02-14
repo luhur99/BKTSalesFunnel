@@ -17,7 +17,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, TrendingUp, Filter, Activity } from "lucide-react";
+import { AlertCircle, TrendingUp, Filter, Activity, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // Type definitions for chart data
 interface VelocityChartData {
@@ -315,7 +316,18 @@ export default function AnalyticsReportPage() {
         
         {/* Header & Filters */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <AnalyticsHeader />
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => router.push("/dashboard")}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Button>
+            <AnalyticsHeader />
+          </div>
           
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto bg-white/80 p-4 rounded-xl shadow-sm border border-white/50 backdrop-blur-sm">
             <div className="flex items-center gap-2">
@@ -374,33 +386,7 @@ export default function AnalyticsReportPage() {
 
         <Separator className="my-8" />
 
-        {/* Follow-Up Funnel Flow - Only for PowerDash Brand's First Funnel */}
-        {(() => {
-          const selectedBrand = brands.find(b => b.id === selectedBrandId);
-          const isPowerDashBrand = selectedBrand?.name.toLowerCase() === "powerdash";
-          const isFirstFunnel = funnels.length > 0 && selectedFunnelId === funnels[0].id;
-          const shouldShowFunnelFlow = isPowerDashBrand && isFirstFunnel;
-
-          if (shouldShowFunnelFlow) {
-            return (
-              <section>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-                    <TrendingUp className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Follow-Up Funnel Flow</h2>
-                    <p className="text-sm text-gray-600">Visualisasi perjalanan lead dari masuk hingga closing</p>
-                  </div>
-                </div>
-                <FollowUpFunnelFlow flowData={funnelFlowData} />
-                <Separator className="my-8" />
-              </section>
-            );
-          }
-          return null;
-        })()}
-
+        {/* Unified Funnel Journey Report - Always show when data exists */}
         {journeySummaries.length > 0 && (
           <section>
             <div className="flex items-center gap-3 mb-6">
@@ -492,6 +478,23 @@ export default function AnalyticsReportPage() {
                 )}
               </CardContent>
             </Card>
+            <Separator className="my-8" />
+          </section>
+        )}
+
+        {/* Follow-Up Funnel Flow - Show for every funnel when data exists */}
+        {funnelFlowData.length > 0 && (
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Follow-Up Funnel Flow</h2>
+                <p className="text-sm text-gray-600">Visualisasi perjalanan lead dari masuk hingga closing</p>
+              </div>
+            </div>
+            <FollowUpFunnelFlow flowData={funnelFlowData} />
             <Separator className="my-8" />
           </section>
         )}
