@@ -29,6 +29,50 @@ const PRESET_COLORS = [
   "pink", "rose", "slate"
 ];
 
+// Color mapping for display
+const COLOR_HEX: Record<string, string> = {
+  red: "#ef4444",
+  orange: "#f97316",
+  amber: "#f59e0b",
+  yellow: "#eab308",
+  lime: "#84cc16",
+  green: "#22c55e",
+  emerald: "#10b981",
+  teal: "#14b8a6",
+  cyan: "#06b6d4",
+  sky: "#0ea5e9",
+  blue: "#3b82f6",
+  indigo: "#6366f1",
+  violet: "#8b5cf6",
+  purple: "#a855f7",
+  fuchsia: "#d946ef",
+  pink: "#ec4899",
+  rose: "#f43f5e",
+  slate: "#64748b"
+};
+
+// Tailwind color classes mapping
+const LABEL_COLOR_CLASSES: Record<string, string> = {
+  red: "bg-red-50 text-red-900 border-red-200",
+  orange: "bg-orange-50 text-orange-900 border-orange-200",
+  amber: "bg-amber-50 text-amber-900 border-amber-200",
+  yellow: "bg-yellow-50 text-yellow-900 border-yellow-200",
+  lime: "bg-lime-50 text-lime-900 border-lime-200",
+  green: "bg-green-50 text-green-900 border-green-200",
+  emerald: "bg-emerald-50 text-emerald-900 border-emerald-200",
+  teal: "bg-teal-50 text-teal-900 border-teal-200",
+  cyan: "bg-cyan-50 text-cyan-900 border-cyan-200",
+  sky: "bg-sky-50 text-sky-900 border-sky-200",
+  blue: "bg-blue-50 text-blue-900 border-blue-200",
+  indigo: "bg-indigo-50 text-indigo-900 border-indigo-200",
+  violet: "bg-violet-50 text-violet-900 border-violet-200",
+  purple: "bg-purple-50 text-purple-900 border-purple-200",
+  fuchsia: "bg-fuchsia-50 text-fuchsia-900 border-fuchsia-200",
+  pink: "bg-pink-50 text-pink-900 border-pink-200",
+  rose: "bg-rose-50 text-rose-900 border-rose-200",
+  slate: "bg-slate-50 text-slate-900 border-slate-200",
+};
+
 export function CustomLabelsTab({ funnelId, onUpdate }: CustomLabelsTabProps) {
   const [labels, setLabels] = useState<CustomLabel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,12 +225,12 @@ export function CustomLabelsTab({ funnelId, onUpdate }: CustomLabelsTabProps) {
                 key={label.id}
                 className={cn(
                   "flex items-center justify-between p-2 rounded-md border bg-card",
-                  `border-${label.color}-200 bg-${label.color}-50`
+                  LABEL_COLOR_CLASSES[label.color] || "bg-slate-50 text-slate-900 border-slate-200"
                 )}
               >
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <Tag className={cn("w-3 h-3 flex-shrink-0", `text-${label.color}-600`)} />
-                  <span className={cn("text-sm font-medium truncate", `text-${label.color}-900`)}>
+                  <Tag className="w-3 h-3 flex-shrink-0" style={{ color: COLOR_HEX[label.color] || '#64748b' }} />
+                  <span className="text-sm font-medium truncate">
                     {label.name}
                   </span>
                 </div>
