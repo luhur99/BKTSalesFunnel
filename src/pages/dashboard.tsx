@@ -2,30 +2,33 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
-import { Plus, Settings as SettingsIcon, BookOpen, BarChart3 } from "lucide-react";
+import { Plus, Settings as SettingsIcon, BookOpen, BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandCard } from "@/components/BrandCard";
 import { AddBrandModal } from "@/components/AddBrandModal";
 import { Brand } from "@/types/brand";
 import { brandService } from "@/services/brandService";
+import { authService } from "@/services/authService";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRole } from "@/hooks/useRole";
 
 export default function Dashboard() {
   const router = useRouter();
   const { toast } = useToast();
+  const { isAdmin } = useRole();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
-    // Check authentication
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (!isLoggedIn) {
-      router.push("/");
-      return;
-    }
-
-    loadBrands();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/");
+      } else {
+        loadBrands();
+      }
+    });
   }, [router]);
 
   const loadBrands = async () => {
@@ -58,9 +61,8 @@ export default function Dashboard() {
     setShowAddModal(false);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userEmail");
+  const handleLogout = async () => {
+    await authService.signOut();
     router.push("/");
   };
 
@@ -118,8 +120,22 @@ export default function Dashboard() {
                   <Plus className="w-4 h-4" />
                   Add New Brand
                 </Button>
-                <Button 
-                  size="sm" 
+                {isAdmin && (
+                  <Link href="/settings?tab=users">
+                    <Button size="sm" variant="outline" className="gap-2">
+                      <Users className="w-4 h-4" />
+                      Manage Users
+                    </Button>
+                  </Link>
+                )}
+                <Link href="/settings">
+                  <Button size="sm" variant="outline" className="gap-2">
+                    <SettingsIcon className="w-4 h-4" />
+                    Settings
+                  </Button>
+                </Link>
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={handleLogout}
                 >

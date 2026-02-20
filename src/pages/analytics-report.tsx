@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { db } from "@/lib/supabase";
+import { db, supabase } from "@/lib/supabase";
 import { brandService } from "@/services/brandService";
-import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelFlowStep, FunnelJourneySummary } from "@/types/analytics";
+import { FunnelLeakageStats, StageVelocity, HeatmapDataPoint, BottleneckWarning, FunnelJourneySummary, FunnelDualFlowData } from "@/types/analytics";
 import { Brand, Funnel } from "@/types/brand";
 import { VelocityChart } from "@/components/analytics/VelocityChart";
 import { HeatmapGrid } from "@/components/analytics/HeatmapGrid";
 import { FunnelHealthCards } from "@/components/analytics/FunnelHealthCards";
 import { BottleneckWarnings } from "@/components/analytics/BottleneckWarnings";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
-import { FollowUpFunnelFlow } from "@/components/analytics/FollowUpFunnelFlow";
+import { FunnelDualTrackFlow } from "@/components/analytics/FunnelDualTrackFlow";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,19 +61,17 @@ export default function AnalyticsReportPage() {
   const [stageVelocity, setStageVelocity] = useState<StageVelocity[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
   const [bottleneckWarnings, setBottleneckWarnings] = useState<BottleneckWarning[]>([]);
-  const [funnelFlowData, setFunnelFlowData] = useState<FunnelFlowStep[]>([]);
+  const [dualFlowDataMap, setDualFlowDataMap] = useState<{ funnel: Funnel; data: FunnelDualFlowData }[]>([]);
   const [journeySummaries, setJourneySummaries] = useState<FunnelJourneyReportRow[]>([]);
 
   useEffect(() => {
-    // Check authentication
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (!isLoggedIn) {
-      router.push("/");
-      return;
-    }
-
-    // Initial load - fetch brands first
-    loadBrands();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/");
+      } else {
+        loadBrands();
+      }
+    });
   }, [router]);
 
   // Load Brands
@@ -139,7 +137,7 @@ export default function AnalyticsReportPage() {
       setStageVelocity([]);
       setHeatmapData([]);
       setBottleneckWarnings([]);
-      setFunnelFlowData([]);
+      setDualFlowDataMap([]);
       setJourneySummaries([]);
       
       // Fetch leakage stats for each funnel in the brand
@@ -194,11 +192,10 @@ export default function AnalyticsReportPage() {
       );
 
       // Fetch other analytics data in parallel
-      const [velocity, heatmap, warnings, funnelFlow] = await Promise.allSettled([
+      const [velocity, heatmap, warnings] = await Promise.allSettled([
         db.analytics.getStageVelocity(funnelId),
         db.analytics.getHeatmapAnalytics("all", funnelId),
         db.analytics.getBottleneckWarnings(funnelId),
-        db.analytics.getFunnelFlowData(funnelId)
       ]);
 
       // Process stage velocity
@@ -216,10 +213,18 @@ export default function AnalyticsReportPage() {
         setBottleneckWarnings(warnings.value);
       }
 
-      // Process funnel flow data
-      if (funnelFlow.status === "fulfilled" && Array.isArray(funnelFlow.value)) {
-        setFunnelFlowData(funnelFlow.value);
-      }
+      // Load per-funnel dual-track flow data
+      const funnelsToLoad = funnelId
+        ? funnelsList.filter(f => f.id === funnelId)
+        : funnelsList;
+      const dualResults = await Promise.all(
+        funnelsToLoad.map(async (funnel) => ({
+          funnel,
+          data: await db.analytics.getDualFlowByFunnel(funnel.id),
+        }))
+      );
+      // Show all funnels — empty ones get an appropriate empty state in the component
+      setDualFlowDataMap(dualResults);
 
     } catch (error) {
       console.error("Error loading analytics:", error);
@@ -386,118 +391,132 @@ export default function AnalyticsReportPage() {
 
         <Separator className="my-8" />
 
-        {/* Unified Funnel Journey Report - Always show when data exists */}
-        {journeySummaries.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Unified Funnel Journey Report</h2>
-                <p className="text-sm text-gray-600">
-                  Perjalanan lead sebagai satu kesatuan (Follow Up + Broadcast) dan metadata iklan
-                </p>
-              </div>
+        {/* Unified Funnel Journey Report */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+              <TrendingUp className="w-5 h-5 text-white" />
             </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Unified Funnel Journey Report</h2>
+              <p className="text-sm text-gray-600">
+                Perjalanan lead sebagai satu kesatuan (Follow Up + Broadcast) dan metadata iklan
+              </p>
+            </div>
+          </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Journey + Traffic Summary</CardTitle>
-                <CardDescription>
-                  Bandingkan funnel dan iklan mana yang paling konversi
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Funnel</TableHead>
-                        <TableHead>Traffic</TableHead>
-                        <TableHead>Audience</TableHead>
-                        <TableHead>Keyword</TableHead>
-                        <TableHead>Goal</TableHead>
-                        <TableHead className="text-right">Leads</TableHead>
-                        <TableHead className="text-right">Win</TableHead>
-                        <TableHead className="text-right">Lost</TableHead>
-                        <TableHead className="text-right">Conv %</TableHead>
-                        <TableHead className="text-right">FU→BC</TableHead>
-                        <TableHead className="text-right">BC→FU</TableHead>
-                        <TableHead className="text-right">Avg Days</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {journeySummaries.map((row) => (
-                        <TableRow key={row.funnel_id}>
-                          <TableCell className="font-medium">{row.funnel_name}</TableCell>
-                          <TableCell>
-                            <div className="text-sm font-medium">
-                              {row.traffic_platform || "-"}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {row.traffic_campaign_name || "-"}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {formatShortDate(row.traffic_start_date)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">{row.traffic_audience_behavior || "-"}</div>
-                            <div className="text-xs text-slate-500">{row.traffic_audience_interest || "-"}</div>
-                          </TableCell>
-                          <TableCell>{row.traffic_keyword || "-"}</TableCell>
-                          <TableCell>{row.traffic_goal_campaign || "-"}</TableCell>
-                          <TableCell className="text-right">{row.total_leads}</TableCell>
-                          <TableCell className="text-right">{row.won_count}</TableCell>
-                          <TableCell className="text-right">{row.lost_count}</TableCell>
-                          <TableCell className="text-right">{row.conversion_rate.toFixed(1)}</TableCell>
-                          <TableCell className="text-right">{row.switches_to_broadcast}</TableCell>
-                          <TableCell className="text-right">{row.switches_to_followup}</TableCell>
-                          <TableCell className="text-right">{row.avg_journey_days.toFixed(1)}</TableCell>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Journey + Traffic Summary</CardTitle>
+              <CardDescription>
+                Bandingkan funnel dan iklan mana yang paling konversi
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {journeySummaries.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Funnel</TableHead>
+                          <TableHead>Traffic</TableHead>
+                          <TableHead>Audience</TableHead>
+                          <TableHead>Keyword</TableHead>
+                          <TableHead>Goal</TableHead>
+                          <TableHead className="text-right">Leads</TableHead>
+                          <TableHead className="text-right">Win</TableHead>
+                          <TableHead className="text-right">Lost</TableHead>
+                          <TableHead className="text-right">Conv %</TableHead>
+                          <TableHead className="text-right">FU→BC</TableHead>
+                          <TableHead className="text-right">BC→FU</TableHead>
+                          <TableHead className="text-right">Avg Days</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {journeySummaries.some((row) => row.traffic_notes) && (
-                  <div className="mt-6 space-y-2">
-                    <div className="text-sm font-semibold text-slate-700">Catatan Funnel</div>
-                    <div className="space-y-2">
-                      {journeySummaries
-                        .filter((row) => row.traffic_notes)
-                        .map((row) => (
-                          <div key={`${row.funnel_id}-note`} className="text-sm text-slate-600">
-                            <span className="font-medium text-slate-800">{row.funnel_name}:</span>{" "}
-                            {row.traffic_notes}
-                          </div>
+                      </TableHeader>
+                      <TableBody>
+                        {journeySummaries.map((row) => (
+                          <TableRow key={row.funnel_id}>
+                            <TableCell className="font-medium">{row.funnel_name}</TableCell>
+                            <TableCell>
+                              <div className="text-sm font-medium">
+                                {row.traffic_platform || "-"}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {row.traffic_campaign_name || "-"}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {formatShortDate(row.traffic_start_date)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">{row.traffic_audience_behavior || "-"}</div>
+                              <div className="text-xs text-slate-500">{row.traffic_audience_interest || "-"}</div>
+                            </TableCell>
+                            <TableCell>{row.traffic_keyword || "-"}</TableCell>
+                            <TableCell>{row.traffic_goal_campaign || "-"}</TableCell>
+                            <TableCell className="text-right">{row.total_leads}</TableCell>
+                            <TableCell className="text-right">{row.won_count}</TableCell>
+                            <TableCell className="text-right">{row.lost_count}</TableCell>
+                            <TableCell className="text-right">{row.conversion_rate.toFixed(1)}</TableCell>
+                            <TableCell className="text-right">{row.switches_to_broadcast}</TableCell>
+                            <TableCell className="text-right">{row.switches_to_followup}</TableCell>
+                            <TableCell className="text-right">{row.avg_journey_days.toFixed(1)}</TableCell>
+                          </TableRow>
                         ))}
-                    </div>
+                      </TableBody>
+                    </Table>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-            <Separator className="my-8" />
-          </section>
-        )}
 
-        {/* Follow-Up Funnel Flow - Show for every funnel when data exists */}
-        {funnelFlowData.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Follow-Up Funnel Flow</h2>
-                <p className="text-sm text-gray-600">Visualisasi perjalanan lead dari masuk hingga closing</p>
-              </div>
+                  {journeySummaries.some((row) => row.traffic_notes) && (
+                    <div className="mt-6 space-y-2">
+                      <div className="text-sm font-semibold text-slate-700">Catatan Funnel</div>
+                      <div className="space-y-2">
+                        {journeySummaries
+                          .filter((row) => row.traffic_notes)
+                          .map((row) => (
+                            <div key={`${row.funnel_id}-note`} className="text-sm text-slate-600">
+                              <span className="font-medium text-slate-800">{row.funnel_name}:</span>{" "}
+                              {row.traffic_notes}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-10 text-slate-400 text-sm">
+                  {loading ? "Loading journey data..." : selectedBrandId ? "Belum ada data journey untuk brand ini. Pastikan funnel sudah memiliki leads." : "Pilih brand untuk melihat Journey Report."}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Separator className="my-8" />
+        </section>
+
+        {/* Per-Funnel Dual-Track Flow */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+              <TrendingUp className="w-5 h-5 text-white" />
             </div>
-            <FollowUpFunnelFlow flowData={funnelFlowData} />
-            <Separator className="my-8" />
-          </section>
-        )}
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Funnel Flow Analysis</h2>
+              <p className="text-sm text-gray-600">Perjalanan lead per funnel — Follow Up & Broadcast track, termasuk perpindahan antar track</p>
+            </div>
+          </div>
+          {dualFlowDataMap.length > 0 ? (
+            <div className="space-y-6">
+              {dualFlowDataMap.map(({ funnel, data }) => (
+                <FunnelDualTrackFlow key={funnel.id} funnelName={funnel.name} data={data} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-slate-400">
+              {loading ? "Loading funnel data..." : selectedBrandId ? "Belum ada data funnel untuk brand ini. Tambahkan leads terlebih dahulu." : "Pilih brand untuk melihat Funnel Flow Analysis."}
+            </div>
+          )}
+          <Separator className="my-8" />
+        </section>
 
         {/* Bottleneck Warnings */}
         {bottleneckWarnings.length > 0 && (

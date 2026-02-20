@@ -7,14 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { User, Mail, Shield, Key, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Admin credentials
-const ADMIN_CREDENTIALS = {
-  email: "luhur@budikaryateknologi.com",
-  password: "BisnisBerkah",
-  name: "Luhur Budi Karya",
-  role: "Super Admin",
-};
+import { supabase } from "@/lib/supabase";
+import { authService } from "@/services/authService";
 
 export function ProfileSecurity() {
   const router = useRouter();
@@ -33,87 +27,60 @@ export function ProfileSecurity() {
   });
 
   useEffect(() => {
-    // Get user info from localStorage
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const userEmail = localStorage.getItem("userEmail");
-    const userName = localStorage.getItem("userName");
-
-    if (!isLoggedIn || isLoggedIn !== "true") {
-      router.push("/");
-      return;
-    }
-
-    setUserInfo({
-      name: userName || ADMIN_CREDENTIALS.name,
-      email: userEmail || ADMIN_CREDENTIALS.email,
-      role: ADMIN_CREDENTIALS.role,
-      joinDate: "January 2025",
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/");
+        return;
+      }
+      const user = session.user;
+      setUserInfo({
+        name: user.user_metadata?.name || user.email?.split("@")[0] || "Administrator",
+        email: user.email || "",
+        role: "Super Admin",
+        joinDate: new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      });
     });
   }, [router]);
 
-  const handleChangePassword = () => {
-    // Validate all fields filled
+  const handleChangePassword = async () => {
     if (!passwordForm.current || !passwordForm.new || !passwordForm.confirm) {
-      toast({
-        title: "Error",
-        description: "Semua field password harus diisi",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Semua field password harus diisi", variant: "destructive" });
       return;
     }
 
-    // Validate current password
-    if (passwordForm.current !== ADMIN_CREDENTIALS.password) {
-      toast({
-        title: "Error",
-        description: "Password saat ini salah",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate new password match
     if (passwordForm.new !== passwordForm.confirm) {
-      toast({
-        title: "Error",
-        description: "Password baru tidak cocok",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Password baru tidak cocok", variant: "destructive" });
       return;
     }
 
-    // Validate password length
     if (passwordForm.new.length < 8) {
-      toast({
-        title: "Error",
-        description: "Password minimal 8 karakter",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Password minimal 8 karakter", variant: "destructive" });
       return;
     }
 
-    // Update admin password (in real app, this would update database)
-    ADMIN_CREDENTIALS.password = passwordForm.new;
+    // Verify current password by re-authenticating
+    const { error: verifyError } = await authService.signIn(userInfo.email, passwordForm.current);
+    if (verifyError) {
+      toast({ title: "Error", description: "Password saat ini salah", variant: "destructive" });
+      return;
+    }
 
-    toast({
-      title: "Success",
-      description: "Password berhasil diubah. Silakan login kembali dengan password baru.",
-    });
+    // Update to new password via Supabase
+    const { error: updateError } = await supabase.auth.updateUser({ password: passwordForm.new });
+    if (updateError) {
+      toast({ title: "Error", description: "Gagal mengubah password: " + updateError.message, variant: "destructive" });
+      return;
+    }
 
-    // Clear form and close
+    toast({ title: "Success", description: "Password berhasil diubah. Silakan login kembali." });
     setPasswordForm({ current: "", new: "", confirm: "" });
     setIsChangingPassword(false);
 
-    // Logout after password change
-    setTimeout(() => {
-      handleLogout();
-    }, 2000);
+    setTimeout(() => handleLogout(), 2000);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("userName");
+  const handleLogout = async () => {
+    await authService.signOut();
     router.push("/");
   };
 

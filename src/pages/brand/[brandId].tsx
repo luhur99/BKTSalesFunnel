@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+
+const log = process.env.NODE_ENV === "development" ? console.log : () => {};
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Link from "next/link";
@@ -10,7 +12,7 @@ import { Brand, Funnel, CreateFunnelInput } from "@/types/brand";
 import type { CustomLabel } from "@/types/lead";
 import { brandService } from "@/services/brandService";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/supabase";
+import { db, supabase } from "@/lib/supabase";
 
 export default function BrandPage() {
   const router = useRouter();
@@ -24,23 +26,20 @@ export default function BrandPage() {
   const [funnelLabels, setFunnelLabels] = useState<Record<string, CustomLabel[]>>({});
 
   useEffect(() => {
-    // Check authentication
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (!isLoggedIn) {
-      router.push("/");
-      return;
-    }
-
-    if (brandId && typeof brandId === "string") {
-      loadBrandData(brandId);
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/");
+      } else if (brandId && typeof brandId === "string") {
+        loadBrandData(brandId);
+      }
+    });
   }, [brandId, router]);
 
   const loadBrandData = async (id: string) => {
     try {
       setLoading(true);
       
-      console.log("🔍 Loading brand data for ID:", id);
+      log("🔍 Loading brand data for ID:", id);
       
       // Load brand info
       const brandData = await brandService.getBrandById(id);
@@ -54,12 +53,12 @@ export default function BrandPage() {
         return;
       }
       setBrand(brandData);
-      console.log("✅ Brand loaded:", brandData.name);
+      log("✅ Brand loaded:", brandData.name);
 
       // Load funnels for this brand
       const funnelsData = await brandService.getFunnelsByBrand(id);
-      console.log("✅ Funnels loaded:", funnelsData.length, "funnels");
-      console.log("📊 Funnel details:", funnelsData);
+      log("✅ Funnels loaded:", funnelsData.length, "funnels");
+      log("📊 Funnel details:", funnelsData);
       setFunnels(funnelsData);
       await loadFunnelLabels(funnelsData);
 

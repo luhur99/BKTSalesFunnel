@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+
+const log = process.env.NODE_ENV === "development" ? console.log : () => {};
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -93,11 +95,11 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       const leadsArray = Array.isArray(leads) ? leads : [];
       
       // Debug logging
-      console.log("🔍 DEBUG: Total leads fetched:", leadsArray.length);
+      log("🔍 DEBUG: Total leads fetched:", leadsArray.length);
       if (leadsArray.length > 0) {
-        console.log("🔍 DEBUG: Sample lead structure:", leadsArray[0]);
-        console.log("🔍 DEBUG: Lead[0] source object:", leadsArray[0].source);
-        console.log("🔍 DEBUG: Lead[0] source.name:", leadsArray[0].source?.name);
+        log("🔍 DEBUG: Sample lead structure:", leadsArray[0]);
+        log("🔍 DEBUG: Lead[0] source object:", leadsArray[0].source);
+        log("🔍 DEBUG: Lead[0] source.name:", leadsArray[0].source?.name);
       }
       
       const sourceMap = new Map<string, number>();
@@ -128,15 +130,15 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       const leadsArray = Array.isArray(leads) ? leads : [];
       
       // Debug logging
-      console.log("🔍 DEBUG: Total leads fetched:", leadsArray.length);
+      log("🔍 DEBUG: Total leads fetched:", leadsArray.length);
       if (leadsArray.length > 0) {
-        console.log("🔍 DEBUG: Sample lead structure:", leadsArray[0]);
-        console.log("🔍 DEBUG: Lead[0] source object:", leadsArray[0].source);
-        console.log("🔍 DEBUG: Lead[0] source.name:", leadsArray[0].source?.name);
+        log("🔍 DEBUG: Sample lead structure:", leadsArray[0]);
+        log("🔍 DEBUG: Lead[0] source object:", leadsArray[0].source);
+        log("🔍 DEBUG: Lead[0] source.name:", leadsArray[0].source?.name);
       }
       
       // 🔍 DEBUG: Log all lead statuses to check format
-      console.log("🔍 DEBUG: All lead statuses:", leadsArray.map(l => ({ 
+      log("🔍 DEBUG: All lead statuses:", leadsArray.map(l => ({ 
         id: l.id, 
         name: l.name, 
         status: l.status,
@@ -155,7 +157,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
         
         // 🔍 DEBUG: Log each lead processing
         if (normalizedStatus === "deal") {
-          console.log("✅ DEAL FOUND:", {
+          log("✅ DEAL FOUND:", {
             name: lead.name,
             source: sourceName,
             status: lead.status,
@@ -173,7 +175,7 @@ export function BottleneckAnalytics({ refreshTrigger }: BottleneckAnalyticsProps
       });
       
       // 🔍 DEBUG: Log final sourceMap
-      console.log("🔍 DEBUG: Source map after processing:", Array.from(sourceMap.entries()).map(([source, data]) => ({
+      log("🔍 DEBUG: Source map after processing:", Array.from(sourceMap.entries()).map(([source, data]) => ({
         source,
         total: data.total,
         deals: data.deals,

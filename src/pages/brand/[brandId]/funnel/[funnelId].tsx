@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+
+const log = process.env.NODE_ENV === "development" ? console.log : () => {};
 import { useRouter } from "next/router";
 import Link from "next/link";
 import SEO from "@/components/SEO";
@@ -6,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Plus, BarChart3, LayoutGrid, List, Settings, TrendingUp, Users, Target, Trophy, XCircle } from "lucide-react";
-import { db } from "@/lib/supabase";
+import { db, supabase } from "@/lib/supabase";
 import { getFunnelById } from "@/services/brandService";
 import type { Funnel } from "@/types/brand";
 import type { Lead, Stage } from "@/types/lead";
@@ -45,6 +47,15 @@ export default function FunnelViewPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailLeadId, setDetailLeadId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auth guard
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        router.push("/");
+      }
+    });
+  }, [router]);
 
   // Load initial data
   useEffect(() => {
@@ -205,12 +216,12 @@ export default function FunnelViewPage() {
   };
 
   const handleLeadUpdated = async () => {
-    console.log("🔄 handleLeadUpdated called - Refreshing leads...");
+    log("🔄 handleLeadUpdated called - Refreshing leads...");
     if (funnelId && typeof funnelId === "string") {
       try {
-        console.log("📊 Fetching fresh leads data for funnel:", funnelId);
+        log("📊 Fetching fresh leads data for funnel:", funnelId);
         const updatedLeads = await db.leads.getByFunnelId(funnelId);
-        console.log("✅ Fresh leads data received:", updatedLeads.length, "leads");
+        log("✅ Fresh leads data received:", updatedLeads.length, "leads");
         
         // Count won and lost leads
         const won = updatedLeads.filter(lead => lead.status === "deal").length;
@@ -222,12 +233,12 @@ export default function FunnelViewPage() {
         // Force state update
         setLeads(updatedLeads);
         setRefreshKey(prev => prev + 1);
-        console.log("✅ Leads state updated successfully");
+        log("✅ Leads state updated successfully");
         
         // Also reload funnel data to update counts
-        console.log("🔄 Reloading funnel data...");
+        log("🔄 Reloading funnel data...");
         await loadFunnel();
-        console.log("✅ Funnel data reloaded");
+        log("✅ Funnel data reloaded");
         
       } catch (error) {
         console.error("❌ Error refreshing leads:", error);

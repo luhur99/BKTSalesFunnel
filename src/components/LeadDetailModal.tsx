@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Calendar, TrendingUp, Activity, Globe, Tag, Edit2, X, Plus } from "lucide-react";
+import { ArrowRight, ArrowLeft, Phone, Mail, Building2, Clock, MessageSquare, FileText, Activity, Globe, Tag, Edit2, X, Plus } from "lucide-react";
 import { Lead, Stage, LeadActivity, ActivityType, StageScript, LeadStageHistory, LeadSource, CustomLabel } from "@/types/lead";
 import { db, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,21 @@ interface EditFormState {
   custom_labels: string[];
   deal_value: string | number;
   created_at: string;
+}
+
+function toDateInputValue(dateString: string | null | undefined): string {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toIsoDateStart(dateInputValue: string): string | null {
+  const [year, month, day] = dateInputValue.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailModalProps) {
@@ -70,21 +85,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     created_at: "",
   });
 
-  const toDateInputValue = (dateString: string | null | undefined) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const toIsoDateStart = (dateInputValue: string) => {
-    const [year, month, day] = dateInputValue.split("-").map(Number);
-    if (!year || !month || !day) return null;
-    return new Date(year, month - 1, day, 0, 0, 0, 0).toISOString();
-  };
-
   const resolveLabelName = (value: string) => {
     return availableLabels.find(label => label.id === value)?.name || value;
   };
@@ -94,31 +94,10 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     return availableLabels.find(label => label.name.toLowerCase() === normalized)?.id;
   };
 
-  useEffect(() => {
-    if (lead) {
-      loadLeadData();
-      // Initialize edit form with lead data
-      setEditForm({
-        name: lead.name || "",
-        email: lead.email || "",
-        phone: lead.phone || "",
-        company: lead.company || "",
-        source_id: lead.source_id || "",
-        status: lead.status || "active",
-        custom_labels: lead.custom_labels || [],
-        deal_value: lead.deal_value ? String(lead.deal_value) : "",
-        created_at: toDateInputValue(lead.created_at),
-      });
-    }
-  }, [lead]);
-
-  const loadLeadData = async () => {
+  const loadLeadData = useCallback(async () => {
     if (!lead) return;
 
     try {
-      console.log("🔄 Loading lead data for brand:", lead.brand_id);
-      
-      // FIX: Load funnels first to get funnel IDs (stages don't have brand_id)
       const { data: funnelsData, error: funnelsError } = await supabase
         .from("funnels")
         .select("id, name")
@@ -126,12 +105,9 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         .order("name", { ascending: true });
 
       if (funnelsError) throw funnelsError;
-      
-      console.log("✅ Loaded ALL funnels:", funnelsData?.length, "funnels");
 
-      // FIX: Extract funnel IDs to query stages
       const funnelIds = funnelsData?.map(f => f.id) || [];
-      
+
       if (funnelIds.length === 0) {
         console.warn("⚠️ No funnels found for brand");
         setStages([]);
@@ -139,7 +115,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         return;
       }
 
-      // FIX: Load ALL stages from ALL funnels in the brand
       const { data: allStagesData, error: stagesError } = await supabase
         .from("stages")
         .select("*")
@@ -148,8 +123,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         .order("stage_number", { ascending: true });
 
       if (stagesError) throw stagesError;
-      
-      console.log("✅ Loaded ALL stages from brand funnels:", allStagesData?.length, "stages");
 
       const leadActivities = await db.activities.getByLead(lead.id);
       const leadHistory = await db.stageHistory.getByLead(lead.id);
@@ -171,7 +144,24 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
     } catch (error) {
       console.error("Error loading lead data:", error);
     }
-  };
+  }, [lead]);
+
+  useEffect(() => {
+    if (lead) {
+      loadLeadData();
+      setEditForm({
+        name: lead.name || "",
+        email: lead.email || "",
+        phone: lead.phone || "",
+        company: lead.company || "",
+        source_id: lead.source_id || "",
+        status: lead.status || "active",
+        custom_labels: lead.custom_labels || [],
+        deal_value: lead.deal_value ? String(lead.deal_value) : "",
+        created_at: toDateInputValue(lead.created_at),
+      });
+    }
+  }, [lead, loadLeadData]);
 
   const handleMoveStage = async () => {
     if (!lead || !moveToStage) return;
@@ -189,11 +179,7 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       }
 
       const fromStage = lead.current_stage;
-      
-      console.log("🔄 Moving lead to stage:", moveToStage);
-      console.log("📊 From:", fromStage?.stage_name, "→ To:", targetStage.stage_name);
-      console.log("📊 Funnel Type:", fromStage?.funnel_type, "→", targetStage.funnel_type);
-      
+
       // FIX #2: Update BOTH current_stage_id AND current_funnel
       await db.leads.update(lead.id, {
         current_stage_id: moveToStage,
@@ -218,15 +204,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: `${fromStage?.stage_name || 'Stage sebelumnya'} → ${targetStage.stage_name}`,
       });
       
-      console.log("🔄 Calling onUpdate to refresh parent data...");
       await onUpdate();
-      console.log("✅ onUpdate completed, waiting before close...");
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log("✅ Closing modal after successful update");
       onClose();
-      
     } catch (error: any) {
       console.error("❌ Error moving lead:", error);
       toast({
@@ -288,9 +267,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.email || "System";
 
-      console.log("🔄 Moving lead to broadcast funnel, stage:", firstBroadcastStage);
-      console.log("📊 From:", lead.current_stage?.stage_name, "(Follow Up) → To:", firstBroadcastStage.stage_name, "(Broadcast)");
-      
       // Update BOTH stage and funnel
       await db.leads.update(lead.id, {
         current_stage_id: firstBroadcastStage.id,
@@ -315,15 +291,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: `${lead.current_stage?.stage_name || 'Stage sebelumnya'} (Follow Up) → ${firstBroadcastStage.stage_name} (Broadcast)`,
       });
 
-      console.log("🔄 Calling onUpdate to refresh parent data...");
       await onUpdate();
-      console.log("✅ onUpdate completed, waiting before close...");
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log("✅ Closing modal after successful update");
       onClose();
-
     } catch (error: any) {
       console.error("❌ Error moving to broadcast:", error);
       toast({
@@ -357,9 +326,6 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.email || "System";
 
-      console.log("🔄 Moving lead to follow-up funnel, stage:", firstFollowUpStage);
-      console.log("📊 From:", lead.current_stage?.stage_name, "(Broadcast) → To:", firstFollowUpStage.stage_name, "(Follow Up)");
-      
       // Update BOTH stage and funnel
       await db.leads.update(lead.id, {
         current_stage_id: firstFollowUpStage.id,
@@ -384,15 +350,8 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         description: `${lead.current_stage?.stage_name || 'Stage sebelumnya'} (Broadcast) → ${firstFollowUpStage.stage_name} (Follow Up)`,
       });
 
-      console.log("🔄 Calling onUpdate to refresh parent data...");
       await onUpdate();
-      console.log("✅ onUpdate completed, waiting before close...");
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      console.log("✅ Closing modal after successful update");
       onClose();
-
     } catch (error: any) {
       console.error("❌ Error moving to follow-up:", error);
       toast({
@@ -463,14 +422,11 @@ export function LeadDetailModal({ lead, isOpen, onClose, onUpdate }: LeadDetailM
         updated_at: new Date().toISOString()
       });
       
-      console.log("✅ Lead updated successfully");
       await onUpdate();
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
       onClose();
     } catch (error) {
       console.error("❌ Error updating lead:", error);
-      alert("Gagal mengupdate lead. Silakan coba lagi.");
+      toast({ title: "Error", description: "Gagal mengupdate lead. Silakan coba lagi.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

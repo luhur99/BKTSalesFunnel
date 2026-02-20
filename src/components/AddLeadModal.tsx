@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,6 @@ interface AddLeadModalProps {
 export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, defaultFunnelId }: AddLeadModalProps) {
   const [sources, setSources] = useState<LeadSource[]>([]);
   const [stages, setStages] = useState<Stage[]>([]);
-  const [funnels, setFunnels] = useState<any[]>([]); // Added missing state
   const [loading, setLoading] = useState(false);
   const [labelInput, setLabelInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +35,7 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
     company: "",
     source_id: "",
     current_stage_id: "",
-    funnel_id: defaultFunnelId || "", // Added missing field
+    funnel_id: defaultFunnelId || "",
     status: "active",
     custom_labels: [] as string[],
     notes: "",
@@ -44,14 +43,64 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
     date_in: new Date().toISOString().split('T')[0]
   });
 
-  // Load sources, funnels, and stages when modal opens
+  // Ref to avoid capturing formData in useCallback closures
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
+
+  const loadInitialData = useCallback(async () => {
+    try {
+      const sourcesData = await db.sources.getAll();
+      setSources(sourcesData || []);
+
+      // Only auto-select source if none is already chosen
+      if (!formDataRef.current.source_id && sourcesData && sourcesData.length > 0) {
+        setFormData(prev => ({ ...prev, source_id: sourcesData[0].id }));
+      }
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+    }
+  }, [defaultBrandId]);
+
+  const loadFunnelStages = useCallback(async (funnelId: string) => {
+    try {
+      const stagesData = await db.stages.getByFunnel(funnelId);
+      setStages(stagesData || []);
+
+      // Auto-select first follow-up stage if no stage selected
+      if (!formDataRef.current.current_stage_id && stagesData && stagesData.length > 0) {
+        const firstFollowUpStage = stagesData.find(s => s.funnel_type === "follow_up");
+        if (firstFollowUpStage) {
+          setFormData(prev => ({
+            ...prev,
+            current_stage_id: firstFollowUpStage.id,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error loading funnel stages:", error);
+      setStages([]);
+    }
+  }, []);
+
+  const loadLabelsForFunnel = useCallback(async (funnelId?: string) => {
+    try {
+      const labelsData = funnelId
+        ? await db.labels.getByFunnel(funnelId)
+        : await db.labels.getAll();
+      setCustomLabels(labelsData);
+    } catch (error) {
+      console.error("Error loading labels:", error);
+    }
+  }, []);
+
+  // Load sources when modal opens
   useEffect(() => {
     if (isOpen) {
       loadInitialData();
     }
-  }, [isOpen]);
+  }, [isOpen, loadInitialData]);
 
-  // Load stages when funnel is selected
+  // Load stages and labels when funnel is selected
   useEffect(() => {
     if (formData.funnel_id) {
       loadFunnelStages(formData.funnel_id);
@@ -60,63 +109,7 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
       setStages([]);
       setFormData(prev => ({ ...prev, current_stage_id: "" }));
     }
-  }, [formData.funnel_id]);
-
-  const loadInitialData = async () => {
-    try {
-      const [sourcesData, funnelsData] = await Promise.all([
-        db.sources.getAll(),
-        defaultBrandId ? db.funnels.getByBrand(defaultBrandId) : Promise.resolve([])
-      ]);
-
-      setSources(sourcesData || []);
-      setFunnels(funnelsData || []);
-
-      if (!formData.source_id && sourcesData && sourcesData.length > 0) {
-        setFormData(prev => ({ ...prev, source_id: sourcesData[0].id }));
-      }
-
-      // If defaultFunnelId is provided, it's already set in formData initial state
-      // triggering the second useEffect
-    } catch (error) {
-      console.error("Error loading initial data:", error);
-    }
-  };
-
-  const loadFunnelStages = async (funnelId: string) => {
-    try {
-      console.log("🔍 Loading stages for funnel:", funnelId);
-      const stagesData = await db.stages.getByFunnel(funnelId);
-      console.log("✅ Stages loaded:", stagesData);
-      setStages(stagesData || []);
-      
-      // Auto-select first follow-up stage if no stage selected
-      if (!formData.current_stage_id && stagesData && stagesData.length > 0) {
-        const firstFollowUpStage = stagesData.find(s => s.funnel_type === "follow_up");
-        if (firstFollowUpStage) {
-          setFormData(prev => ({ 
-            ...prev, 
-            current_stage_id: firstFollowUpStage.id,
-            current_funnel: "follow_up"
-          }));
-        }
-      }
-    } catch (error) {
-      console.error("❌ Error loading funnel stages:", error);
-      setStages([]);
-    }
-  };
-
-  const loadLabelsForFunnel = async (funnelId?: string) => {
-    try {
-      const labelsData = funnelId 
-        ? await db.labels.getByFunnel(funnelId)
-        : await db.labels.getAll();
-      setCustomLabels(labelsData);
-    } catch (error) {
-      console.error("Error loading labels:", error);
-    }
-  };
+  }, [formData.funnel_id, loadFunnelStages, loadLabelsForFunnel]);
 
   const handleAddLabel = () => {
     if (labelInput.trim() && !formData.custom_labels.includes(labelInput.trim())) {
@@ -211,15 +204,11 @@ export function AddLeadModal({ isOpen, onClose, onLeadAdded, defaultBrandId, def
         created_at: formData.date_in ? new Date(formData.date_in).toISOString() : new Date().toISOString()
       };
 
-      console.log("🚀 Submitting payload:", payload);
-
       // 3. Execute
       await db.leads.create(payload);
       if (onLeadAdded) {
         onLeadAdded();
       }
-
-      console.log("✅ Success!");
       onClose();
 
     } catch (err: any) {

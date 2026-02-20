@@ -38,11 +38,14 @@ export interface FunnelFlowStep {
   stage_id: string;
   stage_name: string;
   stage_number: number;
+  funnel_type?: "follow_up" | "broadcast";
   leads_entered: number;
   leads_progressed: number;
   leads_dropped: number;
   drop_rate: number;
   conversion_rate: number;
+  leads_returned_to_followup?: number;
+  leads_switched_to_broadcast?: number;
 }
 
 export interface FunnelJourneySummary {
@@ -90,4 +93,18 @@ export interface AutoLostLeadStats {
   funnelName: string;
   autoLostCount: number;
   avgDaysInStage: number;
+}
+
+export interface FunnelDualFlowData {
+  funnelId: string;
+  totalLeads: number;
+  wonCount: number;
+  lostCount: number;
+  activeLeads: number;
+  followupActive: number;
+  broadcastActive: number;
+  switchesToBroadcast: number;
+  switchesToFollowup: number;
+  followUpStages: FunnelFlowStep[];
+  broadcastStages: FunnelFlowStep[];
 }

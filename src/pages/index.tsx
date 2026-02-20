@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { supabase } from "@/lib/supabase";
+import { authService } from "@/services/authService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,11 +33,12 @@ export default function LandingPage() {
   });
 
   useEffect(() => {
-    // Check if already logged in
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (isLoggedIn) {
-      router.push("/dashboard");
-    }
+    // Redirect already-authenticated users
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.push("/dashboard");
+      }
+    });
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,25 +46,13 @@ export default function LandingPage() {
     setLoading(true);
     setError("");
 
-    // Hardcoded admin credentials
-    const ADMIN_EMAIL = "luhur@budikaryateknologi.com";
-    const ADMIN_PASSWORD = "BisnisBerkah";
+    const { user, error: authError } = await authService.signIn(formData.email, formData.password);
 
-    // Validate credentials
-    if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
-      // Success - Store login state
-      setTimeout(() => {
-        localStorage.setItem("isLoggedIn", "true");
-        localStorage.setItem("userEmail", formData.email);
-        localStorage.setItem("userName", "Administrator");
-        router.push("/dashboard");
-      }, 1000);
+    if (authError || !user) {
+      setError("Email atau password salah. Silakan coba lagi.");
+      setLoading(false);
     } else {
-      // Failed - Show error
-      setTimeout(() => {
-        setError("Email atau password salah. Silakan coba lagi.");
-        setLoading(false);
-      }, 1000);
+      router.push("/dashboard");
     }
   };
 

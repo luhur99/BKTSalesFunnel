@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Tag, Star, Zap, Flag, Heart, AlertCircle, Loader2 } from "lucide-react";
 import { db } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface CustomLabel {
   id: string;
@@ -52,6 +53,7 @@ const COLOR_OPTIONS = [
 ];
 
 export function CustomLabelsManager() {
+  const { toast } = useToast();
   const [labels, setLabels] = useState<CustomLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,22 +65,22 @@ export function CustomLabelsManager() {
     icon: "tag",
   });
 
-  useEffect(() => {
-    loadLabels();
-  }, []);
-
-  const loadLabels = async () => {
+  const loadLabels = useCallback(async () => {
     try {
       setLoading(true);
       const data = await db.customLabels.getAll();
       setLabels(data);
     } catch (error) {
       console.error("Error loading custom labels:", error);
-      alert("Gagal memuat custom labels");
+      toast({ title: "Error", description: "Gagal memuat custom labels", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    loadLabels();
+  }, [loadLabels]);
 
   const handleSave = async () => {
     if (!formData.name.trim()) return;
@@ -98,13 +100,10 @@ export function CustomLabelsManager() {
       setFormData({ name: "", color: "blue", icon: "tag" });
     } catch (error: any) {
       console.error("Error saving custom label:", error);
-      
-      // Check if it's an RLS/auth error
-      if (error?.code === "42501" || error?.message?.includes("row-level security")) {
-        alert("❌ Authentication error: Silakan login kembali untuk menyimpan label.");
-      } else {
-        alert("Gagal menyimpan custom label: " + (error?.message || "Unknown error"));
-      }
+      const description = error?.code === "42501" || error?.message?.includes("row-level security")
+        ? "Authentication error: Silakan login kembali untuk menyimpan label."
+        : "Gagal menyimpan custom label: " + (error?.message || "Unknown error");
+      toast({ title: "Error", description, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -118,13 +117,10 @@ export function CustomLabelsManager() {
       await loadLabels();
     } catch (error: any) {
       console.error("Error deleting custom label:", error);
-      
-      // Check if it's an RLS/auth error
-      if (error?.code === "42501" || error?.message?.includes("row-level security")) {
-        alert("❌ Authentication error: Silakan login kembali untuk menghapus label.");
-      } else {
-        alert("Gagal menghapus custom label: " + (error?.message || "Unknown error"));
-      }
+      const description = error?.code === "42501" || error?.message?.includes("row-level security")
+        ? "Authentication error: Silakan login kembali untuk menghapus label."
+        : "Gagal menghapus custom label: " + (error?.message || "Unknown error");
+      toast({ title: "Error", description, variant: "destructive" });
     }
   };
 

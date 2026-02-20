@@ -5,6 +5,9 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+
+// Only log in development
+const log = process.env.NODE_ENV === "development" ? console.log : () => {};
 import type { 
   Brand, 
   Funnel, 
@@ -202,7 +205,7 @@ export async function getBrandStats(brandId?: string): Promise<BrandStats[]> {
  * Get all funnels for a brand with lead counts
  */
 export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
-  console.log("🔍 [brandService] getFunnelsByBrand called with brandId:", brandId);
+  log("🔍 [brandService] getFunnelsByBrand called with brandId:", brandId);
   
   // First, get all funnels for the brand
   const { data: funnels, error: funnelError } = await supabase
@@ -213,7 +216,7 @@ export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: false });
 
-  console.log("📊 [brandService] Funnels query result:", { funnels, error: funnelError });
+  log("📊 [brandService] Funnels query result:", { funnels, error: funnelError });
 
   if (funnelError) {
     console.error("❌ [brandService] Error fetching funnels:", funnelError);
@@ -225,18 +228,18 @@ export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
     return [];
   }
 
-  console.log("✅ [brandService] Found", funnels.length, "funnels");
+  log("✅ [brandService] Found", funnels.length, "funnels");
 
   // Then, get lead counts for each funnel
   const funnelIds = funnels.map(f => f.id);
-  console.log("🔍 [brandService] Fetching lead counts for funnel IDs:", funnelIds);
+  log("🔍 [brandService] Fetching lead counts for funnel IDs:", funnelIds);
   
   const { data: leadCounts, error: countError } = await supabase
     .from("leads")
     .select("funnel_id")
     .in("funnel_id", funnelIds);
 
-  console.log("📊 [brandService] Lead counts query result:", { leadCounts, error: countError });
+  log("📊 [brandService] Lead counts query result:", { leadCounts, error: countError });
 
   if (countError) {
     console.error("❌ [brandService] Error fetching lead counts:", countError);
@@ -250,7 +253,7 @@ export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
     countMap.set(lead.funnel_id, current + 1);
   });
 
-  console.log("📊 [brandService] Lead count map:", Object.fromEntries(countMap));
+  log("📊 [brandService] Lead count map:", Object.fromEntries(countMap));
 
   // Merge counts with funnels
   const result = funnels.map(funnel => ({
@@ -258,7 +261,7 @@ export async function getFunnelsByBrand(brandId: string): Promise<Funnel[]> {
     total_leads_count: countMap.get(funnel.id) || 0,
   })) as Funnel[];
 
-  console.log("✅ [brandService] Final result:", result);
+  log("✅ [brandService] Final result:", result);
   
   return result;
 }

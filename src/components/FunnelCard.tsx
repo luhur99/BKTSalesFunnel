@@ -4,6 +4,8 @@
  */
 
 import { ArrowRight, Users, TrendingUp, Trash2, Pencil } from "lucide-react";
+
+const log = process.env.NODE_ENV === "development" ? console.log : () => {};
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -63,11 +65,11 @@ export function FunnelCard({ funnel, brandColor, labels = [], onSelect, onDelete
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      console.log("🗑️ Deleting funnel:", funnel.id, funnel.name);
+      log("🗑️ Deleting funnel:", funnel.id, funnel.name);
       
       await db.funnels.delete(funnel.id);
       
-      console.log("✅ Funnel deleted successfully");
+      log("✅ Funnel deleted successfully");
       
       toast({
         title: "✅ Funnel Berhasil Dihapus",

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,15 +38,15 @@ export function FunnelStagesManager() {
     stage_number: 1,
   });
 
-  useEffect(() => {
-    loadStages();
-  }, []);
-
-  const loadStages = async () => {
+  const loadStages = useCallback(async () => {
     const stages = await db.stages.getAll();
     setFollowUpStages(stages.filter((s) => s.funnel_type === "follow_up").sort((a, b) => a.stage_number - b.stage_number));
     setBroadcastStages(stages.filter((s) => s.funnel_type === "broadcast").sort((a, b) => a.stage_number - b.stage_number));
-  };
+  }, []);
+
+  useEffect(() => {
+    loadStages();
+  }, [loadStages]);
 
   const handleAdd = async () => {
     try {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { TrendingDown, TrendingUp, Users, ChevronRight } from "lucide-react";
+import { TrendingDown, TrendingUp, Users, ChevronRight, Radio, GitMerge } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/supabase";
 import { FunnelFlowStep } from "@/types/analytics";
 
@@ -67,6 +68,9 @@ export function FollowUpFunnelFlow({ flowData }: FollowUpFunnelFlowProps) {
   const finalProgressed = steps[steps.length - 1]?.leads_progressed || 0;
   const overallConversion = totalEntered > 0 ? ((finalProgressed / totalEntered) * 100).toFixed(1) : "0";
 
+  const followUpCount = steps.filter(s => s.funnel_type === "follow_up" || !s.funnel_type).length;
+  const broadcastCount = steps.filter(s => s.funnel_type === "broadcast").length;
+
   return (
     <Card className="border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 backdrop-blur">
       <CardHeader>
@@ -76,11 +80,26 @@ export function FollowUpFunnelFlow({ flowData }: FollowUpFunnelFlowProps) {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
                 <TrendingDown className="w-5 h-5 text-white" />
               </div>
-              Follow-Up Funnel Flow
+              Funnel Flow
             </CardTitle>
             <CardDescription className="mt-2 text-base">
               Perjalanan lead dari masuk hingga closing - lihat di mana lead paling banyak drop
             </CardDescription>
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-3">
+              {followUpCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="text-xs text-slate-600 font-medium">Follow Up ({followUpCount} stages)</span>
+                </div>
+              )}
+              {broadcastCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-purple-500" />
+                  <span className="text-xs text-slate-600 font-medium">Broadcast ({broadcastCount} stages)</span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="text-right">
             <div className="text-sm text-slate-600 mb-1">Overall Conversion</div>
@@ -98,22 +117,64 @@ export function FollowUpFunnelFlow({ flowData }: FollowUpFunnelFlowProps) {
           const widthPercent = (step.leads_entered / maxLeads) * 100;
           const isHighDrop = step.drop_rate > 25;
           const isLastStage = index === steps.length - 1;
+          const isBroadcast = step.funnel_type === "broadcast";
+          const prevStep = index > 0 ? steps[index - 1] : null;
+          const typeChanged = prevStep && prevStep.funnel_type !== step.funnel_type;
+
+          // Bar color: red if high drop, purple if broadcast, blue if follow_up
+          const barColor = isHighDrop
+            ? "bg-gradient-to-r from-red-400 to-red-500"
+            : isBroadcast
+              ? "bg-gradient-to-r from-purple-400 to-violet-500"
+              : "bg-gradient-to-r from-blue-400 to-indigo-500";
+
+          // Number badge color
+          const badgeColor = isHighDrop
+            ? "bg-red-100 text-red-700"
+            : isBroadcast
+              ? "bg-purple-100 text-purple-700"
+              : "bg-blue-100 text-blue-700";
 
           return (
             <div key={step.stage_id} className="relative">
+              {/* Section divider when type changes */}
+              {typeChanged && (
+                <div className="flex items-center gap-3 my-4">
+                  <div className="flex-1 border-t border-dashed border-slate-300" />
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                    isBroadcast
+                      ? "bg-purple-100 text-purple-700 border border-purple-200"
+                      : "bg-blue-100 text-blue-700 border border-blue-200"
+                  }`}>
+                    {isBroadcast
+                      ? <><Radio className="w-3 h-3" /> Beralih ke Broadcast</>
+                      : <><GitMerge className="w-3 h-3" /> Beralih ke Follow Up</>
+                    }
+                  </div>
+                  <div className="flex-1 border-t border-dashed border-slate-300" />
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className={`
-                    w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold
-                    ${isHighDrop 
-                      ? 'bg-red-100 text-red-700' 
-                      : 'bg-blue-100 text-blue-700'}
-                  `}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${badgeColor}`}>
                     {step.stage_number}
                   </div>
                   <div>
-                    <div className="font-semibold text-slate-800 text-sm">
-                      {step.stage_name}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-800 text-sm">
+                        {step.stage_name}
+                      </span>
+                      {step.funnel_type === "follow_up" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-blue-300 text-blue-700 bg-blue-50">
+                          Follow Up
+                        </Badge>
+                      )}
+                      {step.funnel_type === "broadcast" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-purple-300 text-purple-700 bg-purple-50">
+                          Broadcast
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
@@ -132,27 +193,18 @@ export function FollowUpFunnelFlow({ flowData }: FollowUpFunnelFlowProps) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className={`text-lg font-bold ${
-                    isHighDrop ? 'text-red-600' : 'text-emerald-600'
-                  }`}>
+                  <div className={`text-lg font-bold ${isHighDrop ? 'text-red-600' : 'text-emerald-600'}`}>
                     {step.conversion_rate}%
                   </div>
-                  <div className="text-xs text-slate-500">
-                    conversion
-                  </div>
+                  <div className="text-xs text-slate-500">conversion</div>
                 </div>
               </div>
 
               {/* Funnel Bar */}
               <div className="relative">
                 <div className="h-12 rounded-lg bg-slate-100 overflow-hidden shadow-inner">
-                  <div 
-                    className={`
-                      h-full transition-all duration-500
-                      ${isHighDrop 
-                        ? 'bg-gradient-to-r from-red-400 to-red-500' 
-                        : 'bg-gradient-to-r from-blue-400 to-indigo-500'}
-                    `}
+                  <div
+                    className={`h-full transition-all duration-500 ${barColor}`}
                     style={{ width: `${widthPercent}%` }}
                   >
                     <div className="h-full flex items-center justify-between px-4 text-white text-sm font-medium">
